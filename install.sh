@@ -118,7 +118,8 @@ extract_mounts_to_file() {
         (contains("target=/home/vscode/.claude,") | not) and
         (contains("target=/home/vscode/.config/gh,") | not) and
         (contains("target=/home/vscode/.gitconfig,") | not) and
-        (contains("target=/workspace/.devcontainer,") | not)
+        (contains("target=/workspace/.devcontainer,") | not) and
+        (contains("target=/home/vscode/.claude/CLAUDE.md,") | not)
       )
     ) | if length > 0 then . else empty end
   ' "$devcontainer_json" 2>/dev/null) || true
