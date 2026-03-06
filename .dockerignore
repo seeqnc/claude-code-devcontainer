@@ -1,4 +1,5 @@
 .git
+**/.git
 *.md
 .github
 .vscode

@@ -38,7 +38,8 @@
         "files.insertFinalNewline": true,
         "files.trimFinalNewlines": true
       }
-    }
+    },
+    "jetbrains": {}
   },
   "remoteUser": "vscode",
   "mounts": [

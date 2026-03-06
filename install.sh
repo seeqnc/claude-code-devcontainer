@@ -205,6 +205,14 @@ cmd_template() {
   cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.zshrc" "$devcontainer_dir/"
+  cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
+
+  # Selective dotfiles copy (no macOS configs, no .git, no install.sh)
+  mkdir -p "$devcontainer_dir/.dotfiles/.claude"
+  for f in .aliases .exports .functions .vimrc starship.toml; do
+    cp "$SCRIPT_DIR/.dotfiles/$f" "$devcontainer_dir/.dotfiles/"
+  done
+  cp "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" "$devcontainer_dir/.dotfiles/.claude/"
 
   # Restore preserved mounts
   if [[ -n "$preserved_mounts" ]]; then
