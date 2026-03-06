@@ -207,12 +207,18 @@ cmd_template() {
   cp "$SCRIPT_DIR/.zshrc" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
 
-  # Selective dotfiles copy (no macOS configs, no .git, no install.sh)
+  # Always create .dotfiles/ (Dockerfile COPY requires it to exist)
   mkdir -p "$devcontainer_dir/.dotfiles/.claude"
-  for f in .aliases .exports .functions .vimrc starship.toml; do
-    cp "$SCRIPT_DIR/.dotfiles/$f" "$devcontainer_dir/.dotfiles/"
-  done
-  cp "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" "$devcontainer_dir/.dotfiles/.claude/"
+
+  # Copy dotfiles if present (optional — only in forks with .dotfiles/)
+  if [[ -d "$SCRIPT_DIR/.dotfiles" ]]; then
+    for f in .aliases .exports .functions .vimrc starship.toml; do
+      [[ -f "$SCRIPT_DIR/.dotfiles/$f" ]] && cp "$SCRIPT_DIR/.dotfiles/$f" "$devcontainer_dir/.dotfiles/"
+    done
+    [[ -f "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" ]] &&
+      cp "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" "$devcontainer_dir/.dotfiles/.claude/"
+    log_info "Dotfiles copied"
+  fi
 
   # Restore preserved mounts
   if [[ -n "$preserved_mounts" ]]; then

@@ -124,13 +124,14 @@ RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/downloa
   -p git \
   -x
 
-# Copy dotfiles into image (selective — no macOS configs, no install.sh)
-COPY --chown=vscode:vscode .dotfiles/.aliases /home/vscode/.aliases
-COPY --chown=vscode:vscode .dotfiles/.exports /home/vscode/.exports
-COPY --chown=vscode:vscode .dotfiles/.functions /home/vscode/.functions
-COPY --chown=vscode:vscode .dotfiles/.vimrc /home/vscode/.vimrc
-COPY --chown=vscode:vscode .dotfiles/starship.toml /home/vscode/.config/starship.toml
-COPY --chown=vscode:vscode .dotfiles/.claude/settings.local.json /opt/dotfiles-claude-settings.local.json
+# Copy dotfiles into staging dir, then move into place (no-op when .dotfiles/ is empty)
+COPY --chown=vscode:vscode .dotfiles/ /tmp/dotfiles/
+RUN for f in .aliases .exports .functions .vimrc; do \
+      if [ -f "/tmp/dotfiles/$f" ]; then cp "/tmp/dotfiles/$f" "$HOME/$f"; fi; \
+    done && \
+    if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
+    if [ -f /tmp/dotfiles/.claude/settings.local.json ]; then cp /tmp/dotfiles/.claude/settings.local.json /opt/dotfiles-claude-settings.local.json; fi && \
+    rm -rf /tmp/dotfiles
 
 # Copy shell configurations
 COPY --chown=vscode:vscode .bashrc /home/vscode/.bashrc
