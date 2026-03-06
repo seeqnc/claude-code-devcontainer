@@ -114,6 +114,53 @@ def fix_directory_ownership():
                 )
 
 
+def deep_merge(base: dict, override: dict) -> dict:
+    """Deep merge two dicts: dicts recurse, lists deduplicate-concatenate, scalars overwrite."""
+    result = dict(base)
+    for key, val in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = deep_merge(result[key], val)
+        elif key in result and isinstance(result[key], list) and isinstance(val, list):
+            merged = list(result[key])
+            for item in val:
+                if item not in merged:
+                    merged.append(item)
+            result[key] = merged
+        else:
+            result[key] = val
+    return result
+
+
+def setup_claude_local_settings():
+    """Merge dotfiles' settings.local.json into the volume-mounted Claude config.
+
+    The dotfiles settings are staged at /opt during build because ~/.claude/ is a
+    Docker volume — files baked into the image layer are hidden by the volume mount.
+    This function reads the staged copy and deep-merges it at runtime.
+    """
+    staged = Path("/opt/dotfiles-claude-settings.local.json")
+    if not staged.exists():
+        return
+
+    target = Path.home() / ".claude" / "settings.local.json"
+
+    override = {}
+    with contextlib.suppress(json.JSONDecodeError):
+        override = json.loads(staged.read_text())
+
+    if not override:
+        return
+
+    existing = {}
+    if target.exists():
+        with contextlib.suppress(json.JSONDecodeError):
+            existing = json.loads(target.read_text())
+
+    merged = deep_merge(existing, override)
+    target.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
+    print(f"[post_install] Claude local settings merged: {target}", file=sys.stderr)
+
+
 def setup_global_gitignore():
     """Set up global gitignore and local git config.
 
@@ -212,6 +259,7 @@ def main():
     print("[post_install] Starting post-install configuration...", file=sys.stderr)
 
     setup_claude_settings()
+    setup_claude_local_settings()
     setup_tmux_config()
     fix_directory_ownership()
     setup_global_gitignore()

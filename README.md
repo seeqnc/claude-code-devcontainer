@@ -13,6 +13,8 @@ Running Claude with `bypassPermissions` on your host machine is risky—it can e
 - **Experimental work**: Let Claude modify code freely in isolation
 - **Multi-repo engagements**: Work on multiple related repositories
 
+**Works with:** VS Code, Cursor, and JetBrains IDEs (IntelliJ, GoLand, PyCharm, etc.)
+
 ## Prerequisites
 
 - **Docker runtime** (one of):
@@ -95,6 +97,17 @@ devc shell      # Opens shell in container
 3. Open **your project folder** in VS Code, then:
    - Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
    - Type "Reopen in Container" and select **Dev Containers: Reopen in Container**
+
+**JetBrains IDEs (IntelliJ, GoLand, PyCharm, etc.):**
+
+1. Install the [Dev Containers plugin](https://plugins.jetbrains.com/plugin/21105-dev-containers) from the JetBrains Marketplace
+2. Set up the devcontainer:
+
+   ```bash
+   devc .
+   ```
+
+3. Open the project in your JetBrains IDE — it will detect `.devcontainer/devcontainer.json` and offer to reopen in the container
 
 ### Pattern B: Shared Workspace Container (Grouped)
 
@@ -193,14 +206,20 @@ The container auto-configures `bypassPermissions` mode—Claude runs commands wi
 
 | Component | Details |
 |-----------|---------|
-| Base | Ubuntu 24.04, Node.js 22, Python 3.13 + uv, zsh |
+| Base | Ubuntu 24.04, Node.js 22, Python 3.13 + uv, Deno |
+| Shells | zsh (default, Oh My Zsh) and bash, both with starship prompt |
 | User | `vscode` (passwordless sudo), working dir `/workspace` |
-| Tools | `rg`, `fd`, `tmux`, `fzf`, `delta`, `iptables`, `ipset` |
+| Search & nav | `rg`, `fd`, `fzf`, `zoxide` (`j` to jump) |
+| Dev tools | `tmux`, `delta`, `bat`, `eza`, `lazygit`, `ast-grep` |
+| Network | `iptables`, `ipset`, `dnsutils` |
 | Volumes (survive rebuilds) | Command history (`/commandhistory`), Claude config (`~/.claude`), GitHub CLI auth (`~/.config/gh`) |
 | Host mounts | `~/.gitconfig` (read-only), `.devcontainer/` (read-only) |
-| Auto-configured | [anthropics](https://github.com/anthropics/claude-code-plugins) + [trailofbits](https://github.com/trailofbits/claude-code-plugins) skills, git-delta |
+| Claude plugins | [anthropics](https://github.com/anthropics/claude-code-plugins) + [trailofbits](https://github.com/trailofbits/claude-code-plugins) skills, [everything-claude-code](https://github.com/nicobailon/everything-claude-code) |
+| Dotfiles | Personal aliases, functions, exports, vim config, starship theme |
 
 Volumes are stored outside the container, so your shell history, Claude settings, and `gh` login persist even after `devc rebuild`. Host `~/.gitconfig` is mounted read-only for git identity.
+
+> **Nerd Font required:** The starship prompt uses Nerd Font glyphs. Install a [Nerd Font](https://www.nerdfonts.com/) (e.g., JetBrains Mono Nerd, FiraCode Nerd) in your host terminal, or prompt symbols will render as boxes.
 
 ## Troubleshooting
 
@@ -247,4 +266,19 @@ Test the container:
 ```bash
 devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . zsh
+
+# Verify tools
+devcontainer exec --workspace-folder . bash -c \
+  "starship --version && zoxide --version && bat --version && eza --version && lazygit --version && fd --version && deno --version && claude --version"
+
+# Verify both shells
+devcontainer exec --workspace-folder . zsh -ic "type j && type ll && type sg"
+devcontainer exec --workspace-folder . bash -ic "type j && type ll && type sg"
+```
+
+Lint shell scripts:
+
+```bash
+shellcheck install.sh .bashrc .zshrc
+shfmt -i 2 -d install.sh .bashrc
 ```

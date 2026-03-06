@@ -120,7 +120,8 @@ extract_mounts_to_file() {
         (contains("target=/home/vscode/.claude,") | not) and
         (contains("target=/home/vscode/.config/gh,") | not) and
         (contains("target=/home/vscode/.gitconfig,") | not) and
-        (contains("target=/workspace/.devcontainer,") | not)
+        (contains("target=/workspace/.devcontainer,") | not) and
+        (contains("target=/home/vscode/.claude/CLAUDE.md,") | not)
       )
     ) | if length > 0 then . else empty end
   ' "$devcontainer_json" 2>/dev/null) || true
@@ -207,6 +208,20 @@ cmd_template() {
   cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.zshrc" "$devcontainer_dir/"
+  cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
+
+  # Always create .dotfiles/ (Dockerfile COPY requires it to exist)
+  mkdir -p "$devcontainer_dir/.dotfiles/.claude"
+
+  # Copy dotfiles if present (optional — only in forks with .dotfiles/)
+  if [[ -d "$SCRIPT_DIR/.dotfiles" ]]; then
+    for f in .aliases .exports .functions .vimrc starship.toml; do
+      [[ -f "$SCRIPT_DIR/.dotfiles/$f" ]] && cp "$SCRIPT_DIR/.dotfiles/$f" "$devcontainer_dir/.dotfiles/"
+    done
+    [[ -f "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" ]] &&
+      cp "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" "$devcontainer_dir/.dotfiles/.claude/"
+    log_info "Dotfiles copied"
+  fi
 
   # Restore preserved mounts
   if [[ -n "$preserved_mounts" ]]; then

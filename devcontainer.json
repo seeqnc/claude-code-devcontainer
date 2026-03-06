@@ -38,7 +38,8 @@
         "files.insertFinalNewline": true,
         "files.trimFinalNewlines": true
       }
-    }
+    },
+    "jetbrains": {}
   },
   "remoteUser": "vscode",
   "mounts": [
@@ -46,7 +47,8 @@
     "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
     "source=claude-code-gh-${devcontainerId},target=/home/vscode/.config/gh,type=volume",
     "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly",
-    "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,readonly"
+    "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,readonly",
+    "source=${localEnv:HOME}/.claude/CLAUDE.md,target=/home/vscode/.claude/CLAUDE.md,type=bind,readonly"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
@@ -63,7 +65,7 @@
     "PYTHONDONTWRITEBYTECODE": "1",
     "PIP_DISABLE_PIP_VERSION_CHECK": "1"
   },
-  "initializeCommand": "test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\"",
+  "initializeCommand": "test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\" && mkdir -p \"$HOME/.claude\" && test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\"",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
   "postCreateCommand": "uv run --no-project /opt/post_install.py"
