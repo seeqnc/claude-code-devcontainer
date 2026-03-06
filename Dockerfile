@@ -67,7 +67,7 @@ RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.confi
 
 # Set environment variables
 ENV DEVCONTAINER=true
-ENV SHELL=/bin/zsh
+ENV SHELL=/bin/bash
 
 WORKDIR /workspace
 
