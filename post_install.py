@@ -10,7 +10,6 @@ Runs on container creation to set up:
 import contextlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -162,21 +161,6 @@ def setup_claude_local_settings():
     print(f"[post_install] Claude local settings merged: {target}", file=sys.stderr)
 
 
-def setup_host_claude_md():
-    """Copy host CLAUDE.md into the volume-mounted ~/.claude/ directory.
-
-    The host file is bind-mounted to /opt/host-claude.md because binding directly
-    into ~/.claude/ doesn't work — the Docker volume at ~/.claude/ shadows it.
-    """
-    staged = Path("/opt/host-claude.md")
-    if not staged.exists():
-        return
-
-    target = Path.home() / ".claude" / "CLAUDE.md"
-    shutil.copy2(staged, target)
-    print(f"[post_install] Host CLAUDE.md copied: {target}", file=sys.stderr)
-
-
 def setup_global_gitignore():
     """Set up global gitignore and local git config.
 
@@ -276,7 +260,6 @@ def main():
 
     setup_claude_settings()
     setup_claude_local_settings()
-    setup_host_claude_md()
     setup_tmux_config()
     fix_directory_ownership()
     setup_global_gitignore()
