@@ -32,7 +32,9 @@ set pastetoggle=<F2>
 
 filetype plugin indent on
 syntax on
+set termguicolors
 colorscheme habamax
+highlight Normal ctermbg=NONE guibg=NONE
 
 let g:vim_json_syntax_conceal = 0
 
@@ -57,12 +59,6 @@ nnoremap <F5> :set listchars=eol:¬,tab:>·,trail:~,extends:>,precedes:<,space:�
 
 " YAML 2-space indent
 autocmd Filetype yaml,yml setlocal ts=2 sw=2 expandtab
-
-" Markdown filetype
-augroup markdown
-    au!
-    au BufNewFile,BufRead *.md,*.markdown setlocal filetype=ghmarkdown
-augroup END
 
 " TAB completion in popup menu
 inoremap <expr><TAB> pumvisible() ? "\<C-n>" : "\<TAB>"
