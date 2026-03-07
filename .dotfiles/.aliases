@@ -35,7 +35,7 @@ if command -v eza &>/dev/null; then
             l) args+=(-l) ;;
             a) args+=(-a) ;;
             h) args+=(-h) ;;
-            s) args+=(-s) ;;  # eza: show file size
+            s) args+=(--blocks) ;;  # eza: show allocated blocks (ls -s equivalent)
             F) args+=(--classify) ;;
             R) args+=(--recurse) ;;
             *) args+=("-${flags:i:1}") ;;
