@@ -100,7 +100,7 @@ devc shell      # Opens shell in container
 
 **JetBrains IDEs (IntelliJ, GoLand, PyCharm, etc.):**
 
-1. Install the [Dev Containers plugin](https://plugins.jetbrains.com/plugin/21105-dev-containers) from the JetBrains Marketplace
+1. Install the [Dev Containers plugin](https://plugins.jetbrains.com/plugin/21962-dev-containers) from the JetBrains Marketplace
 2. Set up the devcontainer:
 
    ```bash
