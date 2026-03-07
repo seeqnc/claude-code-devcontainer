@@ -163,6 +163,57 @@ This adds a bind mount to `devcontainer.json` and recreates the container. Exist
 
 > **Security note:** Avoid mounting large host directories (e.g., `$HOME`). Every mounted path is writable from inside the container unless `--readonly` is specified, which undermines the filesystem isolation this project provides.
 
+## Plugin Configuration
+
+Marketplace plugin sources are installed at build time, but plugins must be individually enabled. To avoid manual enabling after each rebuild, configure auto-enabled plugins in `.dotfiles/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "everything-claude-code@everything-claude-code": true,
+    "code-simplifier@claude-plugins-official": true
+  }
+}
+```
+
+This file is deep-merged into `~/.claude/settings.json` at container creation, so your plugin selections persist across rebuilds. To disable a plugin, remove its entry or set it to `false`.
+
+The format is `"plugin-name@marketplace-name": true`. To find available plugin names, run `claude plugin list` inside the container.
+
+## API Key Passthrough
+
+API keys set on the host are automatically forwarded into the container:
+
+| Variable | Service |
+|----------|---------|
+| `ANTHROPIC_API_KEY` | Claude Code (bypasses interactive `claude login`) |
+| `OPENAI_API_KEY` | OpenAI-based plugins and tools |
+| `EXA_API_KEY` | Exa AI search |
+
+Set them in your host shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or export before starting the container:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+devc up
+```
+
+If a key is not set on the host, the variable is left unset inside the container so tools fall back to their default auth flow (e.g., `claude login`).
+
+## Host Directory Mounts
+
+The following `~/.claude/` subdirectories are bind-mounted read-only into the container:
+
+| Host path | Container path | Content |
+|-----------|---------------|---------|
+| `~/.claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions |
+| `~/.claude/commands/` | `~/.claude/commands/` | Custom slash commands |
+| `~/.claude/skills/` | `~/.claude/skills/` | Learned skills |
+| `~/.claude/rules/` | `~/.claude/rules/` | Project rules |
+| `~/.claude/docs/` | `~/.claude/docs/` | Documentation (e.g., `CI.md` referenced in CLAUDE.md) |
+
+Directories are created on the host automatically if they don't exist. All mounts are **read-only** — skills and commands created inside the container won't persist to the host.
+
 ## Network Isolation
 
 By default, containers have full outbound network access. For stricter security, use iptables to restrict network access.
@@ -207,13 +258,14 @@ The container auto-configures `bypassPermissions` mode—Claude runs commands wi
 | Component | Details |
 |-----------|---------|
 | Base | Ubuntu 24.04, Node.js 22, Python 3.13 + uv, Deno |
-| Shells | zsh (default, Oh My Zsh) and bash, both with starship prompt |
+| Shells | bash (default) and zsh (Oh My Zsh), both with starship prompt |
 | User | `vscode` (passwordless sudo), working dir `/workspace` |
 | Search & nav | `rg`, `fd`, `fzf`, `zoxide` (`j` to jump) |
 | Dev tools | `tmux`, `delta`, `bat`, `eza`, `lazygit`, `ast-grep` |
 | Network | `iptables`, `ipset`, `dnsutils` |
 | Volumes (survive rebuilds) | Command history (`/commandhistory`), Claude config (`~/.claude`), GitHub CLI auth (`~/.config/gh`) |
-| Host mounts | `~/.gitconfig` (read-only), `.devcontainer/` (read-only) |
+| Host mounts | `~/.gitconfig`, `.devcontainer/`, `~/.claude/{CLAUDE.md,commands,skills,rules,docs}` (all read-only) |
+| API keys | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY` (from host env) |
 | Claude plugins | [anthropics](https://github.com/anthropics/claude-code-plugins) + [trailofbits](https://github.com/trailofbits/claude-code-plugins) skills, [everything-claude-code](https://github.com/nicobailon/everything-claude-code) |
 | Dotfiles | Personal aliases, functions, exports, vim config, starship theme |
 
