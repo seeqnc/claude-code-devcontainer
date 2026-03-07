@@ -225,6 +225,8 @@ cmd_template() {
     done
     [[ -f "$SCRIPT_DIR/.dotfiles/.claude/settings.json" ]] &&
       cp "$SCRIPT_DIR/.dotfiles/.claude/settings.json" "$devcontainer_dir/.dotfiles/.claude/"
+    [[ -f "$SCRIPT_DIR/.dotfiles/.claude/statusline.sh" ]] &&
+      cp "$SCRIPT_DIR/.dotfiles/.claude/statusline.sh" "$devcontainer_dir/.dotfiles/.claude/"
     [[ -f "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" ]] &&
       cp "$SCRIPT_DIR/.dotfiles/.claude/settings.local.json" "$devcontainer_dir/.dotfiles/.claude/"
     log_info "Dotfiles copied"

@@ -160,6 +160,18 @@ def setup_claude_settings_from_dotfiles():
     print("[post_install] Claude settings merged from dotfiles", file=sys.stderr)
 
 
+def setup_claude_statusline():
+    """Deploy statusline script from dotfiles into the volume-mounted Claude config."""
+    staged = Path("/opt/dotfiles-claude-statusline.sh")
+    if not staged.exists():
+        return
+
+    target = Path.home() / ".claude" / "statusline.sh"
+    target.write_bytes(staged.read_bytes())
+    target.chmod(0o755)
+    print(f"[post_install] Claude statusline deployed: {target}", file=sys.stderr)
+
+
 def setup_claude_local_settings():
     """Merge dotfiles' settings.local.json into the volume-mounted Claude config.
 
@@ -289,6 +301,7 @@ def main():
 
     setup_claude_settings()
     setup_claude_settings_from_dotfiles()
+    setup_claude_statusline()
     setup_claude_local_settings()
     setup_tmux_config()
     fix_directory_ownership()

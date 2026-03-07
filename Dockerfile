@@ -131,6 +131,7 @@ RUN for f in .aliases .exports .functions .vimrc; do \
     done && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -f /tmp/dotfiles/.claude/settings.json ]; then cp /tmp/dotfiles/.claude/settings.json /opt/dotfiles-claude-settings.json; fi && \
+    if [ -f /tmp/dotfiles/.claude/statusline.sh ]; then cp /tmp/dotfiles/.claude/statusline.sh /opt/dotfiles-claude-statusline.sh && chmod +x /opt/dotfiles-claude-statusline.sh; fi && \
     if [ -f /tmp/dotfiles/.claude/settings.local.json ]; then cp /tmp/dotfiles/.claude/settings.local.json /opt/dotfiles-claude-settings.local.json; fi && \
     rm -rf /tmp/dotfiles
 
