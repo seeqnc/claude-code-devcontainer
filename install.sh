@@ -95,6 +95,53 @@ get_workspace_folder() {
   echo "${1:-$(pwd)}"
 }
 
+# Detect if a workspace is a git worktree and resolve the main .git directory.
+# Outputs the absolute path to the main .git/ directory on stdout.
+# Returns empty (no output) if the workspace is a normal repo or not a git repo.
+resolve_git_worktree() {
+  local workspace="$1"
+
+  # Not a git worktree if .git is a directory (normal repo) or missing
+  [[ -f "$workspace/.git" ]] || return 0
+
+  # git must be available on the host
+  command -v git &>/dev/null || return 0
+
+  # Resolve the shared .git directory (the "common dir")
+  local common_dir
+  common_dir=$(git -C "$workspace" rev-parse --git-common-dir 2>/dev/null) || return 0
+
+  # Canonicalize to absolute path
+  (cd "$common_dir" 2>/dev/null && pwd) || return 0
+}
+
+# If the workspace is a git worktree, inject a bind mount for the main .git
+# directory so that git operations work inside the container. The mount uses
+# the same absolute path on both host and container so the .git file's
+# gitdir: pointer resolves without modification.
+setup_worktree_mount() {
+  local workspace="$1"
+  local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+
+  [[ -f "$devcontainer_json" ]] || return 0
+
+  local git_dir
+  git_dir=$(resolve_git_worktree "$workspace")
+
+  if [[ -n "$git_dir" ]]; then
+    log_info "Git worktree detected. Mounting $git_dir for git access."
+    update_devcontainer_mounts "$devcontainer_json" "$git_dir" "$git_dir" "false"
+  else
+    # Clean up stale worktree mounts: remove any mount whose target ends
+    # with /.git (the pattern used by injected worktree mounts)
+    local updated
+    updated=$(jq '
+      .mounts = ((.mounts // []) | map(select(test("target=.*/\\.git,") | not)))
+    ' "$devcontainer_json" 2>/dev/null) || return 0
+    echo "$updated" >"$devcontainer_json"
+  fi
+}
+
 # Extract custom mounts from devcontainer.json to a temp file
 # Returns the temp file path, or empty string if no custom mounts
 #
@@ -248,6 +295,7 @@ cmd_up() {
 
   check_devcontainer_cli
   check_no_sys_admin "$workspace_folder"
+  setup_worktree_mount "$workspace_folder"
   log_info "Starting devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder"
@@ -260,6 +308,7 @@ cmd_rebuild() {
 
   check_devcontainer_cli
   check_no_sys_admin "$workspace_folder"
+  setup_worktree_mount "$workspace_folder"
   log_info "Rebuilding devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder" --remove-existing-container

@@ -214,6 +214,24 @@ The following `~/.claude/` subdirectories are bind-mounted read-only into the co
 
 Directories are created on the host automatically if they don't exist. All mounts are **read-only** — skills and commands created inside the container won't persist to the host.
 
+## Git Worktrees
+
+Running `devc` from inside a git worktree works automatically. The CLI detects worktrees (where `.git` is a file, not a directory), resolves the main repository's `.git/` directory, and mounts it into the container at the same absolute path so git's `gitdir:` pointer resolves without modification.
+
+```bash
+git worktree add ../feature-branch feature-branch
+cd ../feature-branch
+devc .          # Worktree detected, main .git/ mounted automatically
+devc shell
+git status      # Works — full git history, commits, rebases all functional
+```
+
+**How it works:** `devc up` and `devc rebuild` call `git rev-parse --git-common-dir` to find the shared `.git/` directory, then inject a bind mount into `devcontainer.json`. The mount is read-write so commits, rebases, and merges work from inside the container.
+
+**Limitations:**
+- The main repository's `.git/` directory must be accessible to Docker (on macOS, paths under `/Users/` are shared by default)
+- The worktree mount persists in `devcontainer.json` as a custom mount and survives `devc template` updates
+
 ## Network Isolation
 
 By default, containers have full outbound network access. For stricter security, use iptables to restrict network access.

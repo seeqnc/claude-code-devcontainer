@@ -295,6 +295,27 @@ node_modules/
     print(f"[post_install] Local git config created: {local_gitconfig}", file=sys.stderr)
 
 
+def validate_git_worktree():
+    """Check if workspace is a git worktree and verify the git dir is accessible."""
+    git_file = Path("/workspace/.git")
+    if not git_file.exists() or git_file.is_dir():
+        return
+
+    content = git_file.read_text().strip()
+    if not content.startswith("gitdir:"):
+        return
+
+    gitdir_path = Path(content.split(":", 1)[1].strip())
+    if gitdir_path.exists():
+        print(f"[post_install] Git worktree OK: {gitdir_path}", file=sys.stderr)
+    else:
+        print(
+            f"[post_install] WARNING: Git worktree target not found: {gitdir_path}\n"
+            f"[post_install] Git operations will fail. Run 'devc rebuild' to fix.",
+            file=sys.stderr,
+        )
+
+
 def main():
     """Run all post-install configuration."""
     print("[post_install] Starting post-install configuration...", file=sys.stderr)
@@ -306,6 +327,7 @@ def main():
     setup_tmux_config()
     fix_directory_ownership()
     setup_global_gitignore()
+    validate_git_worktree()
 
     print("[post_install] Configuration complete!", file=sys.stderr)
 
