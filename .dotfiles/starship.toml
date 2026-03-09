@@ -17,7 +17,7 @@ $kubernetes\
 $line_break\
 $username\
 $time\
-$env_var_DEVCONTAINER\
+${env_var.DEVCONTAINER}\
 $character"""
 
 [username]
