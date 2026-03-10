@@ -136,9 +136,10 @@ RUN for f in .aliases .exports .functions .vimrc; do \
     rm -rf /tmp/dotfiles
 
 # Pre-install vim-plug and plugins so vim starts clean without network calls
+ARG VIM_PLUG_VERSION=0.14.0
 RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
-      https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim && \
-    vim -es -u "$HOME/.vimrc" +PlugInstall +qall 2>/dev/null || true
+      "https://raw.githubusercontent.com/junegunn/vim-plug/${VIM_PLUG_VERSION}/plug.vim" && \
+    (vim -es -u "$HOME/.vimrc" +PlugInstall +qall || true)
 
 # Copy shell configurations
 COPY --chown=vscode:vscode .bashrc /home/vscode/.bashrc
@@ -157,7 +158,7 @@ export HISTSIZE=200000
 export HISTFILESIZE=200000
 alias sg=ast-grep
 # Fall back to xterm-256color if host TERM has no terminfo entry
-if ! infocmp "$TERM" &>/dev/null; then
+if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/dev/null; }; then
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)

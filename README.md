@@ -223,7 +223,7 @@ Git and `gh` inside the container authenticate via one of two methods. The recom
    source ~/.zshrc       # or restart your terminal
    devc rebuild
    devc shell
-   echo $GH_TOKEN        # should print the token
+   gh auth status        # should show "Logged in" via GH_TOKEN
    gh pr list            # uses GH_TOKEN automatically
    git push origin feat  # credential helper delegates to gh
    ```
@@ -360,10 +360,10 @@ npm install -g @devcontainers/cli
 
 ### GitHub CLI / git push not working
 
-If using a fine-grained PAT, verify it's set on the host:
+If using a fine-grained PAT, verify it's reaching the container:
 
 ```bash
-echo $GH_TOKEN          # Should print github_pat_...
+gh auth status          # Should show "Logged in" via GH_TOKEN
 ```
 
 If using OAuth, the `~/.config/gh/` volume may need an ownership fix:
