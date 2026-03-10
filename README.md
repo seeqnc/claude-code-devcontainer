@@ -190,15 +190,68 @@ API keys set on the host are automatically forwarded into the container:
 | `ANTHROPIC_API_KEY` | Claude Code (bypasses interactive `claude login`) |
 | `OPENAI_API_KEY` | OpenAI-based plugins and tools |
 | `EXA_API_KEY` | Exa AI search |
+| `GH_TOKEN` | GitHub CLI and git HTTPS (see [GitHub Authentication](#github-authentication)) |
 
-Set them in your host shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or export before starting the container:
+Add them to your host shell profile (e.g., `~/.bashrc`, `~/.zshrc`) so they persist across sessions. Environment variables are read from the host at **container creation time** — if you add or change a key, rebuild the container to pick it up:
 
 ```bash
+# First time or after changing a key
 export ANTHROPIC_API_KEY=sk-ant-...
-devc up
+devc rebuild                        # re-creates container with new env
+devc shell
 ```
 
 If a key is not set on the host, the variable is left unset inside the container so tools fall back to their default auth flow (e.g., `claude login`).
+
+## GitHub Authentication
+
+Git and `gh` inside the container authenticate via one of two methods. The recommended approach uses a fine-grained PAT for minimal blast radius; the fallback uses interactive OAuth.
+
+### Option A: Fine-Grained PAT (Recommended)
+
+1. Create a [fine-grained personal access token](https://github.com/settings/tokens?type=beta) scoped to the repository you're working on. Grant only the permissions you need (typically **Contents: Read & write** and **Pull requests: Read & write**).
+
+2. Add it to your host shell profile (`~/.bashrc` or `~/.zshrc`):
+
+   ```bash
+   export GH_TOKEN=github_pat_...
+   ```
+
+3. Rebuild the container to pick up the new variable, then verify:
+
+   ```bash
+   source ~/.zshrc       # or restart your terminal
+   devc rebuild
+   devc shell
+   gh auth status        # should show "Logged in" via GH_TOKEN
+   gh pr list            # uses GH_TOKEN automatically
+   git push origin feat  # credential helper delegates to gh
+   ```
+
+The token flows through `containerEnv` in `devcontainer.json`. Inside the container, git's credential helper is configured to delegate to `gh auth git-credential`, which reads `GH_TOKEN` from the environment.
+
+**Why this is safer:** A fine-grained PAT scoped to a single repo limits the damage if a prompt injection bypasses the safety hooks. Broad OAuth tokens grant access to every repo you can reach.
+
+### Option B: Interactive OAuth (Fallback)
+
+If `GH_TOKEN` is not set, fall back to `gh auth login`:
+
+```bash
+devc shell
+gh auth login          # Follow the interactive browser flow
+```
+
+The OAuth credentials are stored in `~/.config/gh/`, which is a persistent Docker volume — they survive container rebuilds. However, this grants access to all repositories your GitHub account can reach.
+
+### How It Works
+
+| Layer | What it does |
+|-------|-------------|
+| `devcontainer.json` | Passes `GH_TOKEN` from host via `containerEnv` |
+| `post_install.py` | Configures `[credential "https://github.com"]` in `~/.gitconfig.local` to delegate to `gh auth git-credential` |
+| `.zshrc` / `.bashrc` | Unsets `GH_TOKEN` if the host didn't have it set (prevents empty string from overriding volume auth) |
+| `check-shell-bypass.sh` | Blocks `GH_TOKEN=` and `GITHUB_TOKEN=` overrides to prevent prompt injection from hijacking auth |
+| `~/.config/gh/` volume | Persists OAuth credentials for Option B across rebuilds |
 
 ## Host Directory Mounts
 
@@ -283,7 +336,7 @@ The container auto-configures `bypassPermissions` mode—Claude runs commands wi
 | Network | `iptables`, `ipset`, `dnsutils` |
 | Volumes (survive rebuilds) | Command history (`/commandhistory`), Claude config (`~/.claude`), GitHub CLI auth (`~/.config/gh`) |
 | Host mounts | `~/.gitconfig`, `.devcontainer/`, `~/.claude/{CLAUDE.md,commands,skills,rules,docs}` (all read-only) |
-| API keys | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY` (from host env) |
+| API keys | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY`, `GH_TOKEN` (from host env) |
 | Claude plugins | [anthropics](https://github.com/anthropics/claude-code-plugins) + [trailofbits](https://github.com/trailofbits/claude-code-plugins) skills, [everything-claude-code](https://github.com/nicobailon/everything-claude-code) |
 | Dotfiles | Personal aliases, functions, exports, vim config, starship theme |
 
@@ -305,13 +358,21 @@ npm install -g @devcontainers/cli
 2. Try rebuilding: `devc rebuild`
 3. Check logs: `docker logs $(docker ps -lq)`
 
-### GitHub CLI auth not persisting
+### GitHub CLI / git push not working
 
-The gh volume may need ownership fix:
+If using a fine-grained PAT, verify it's reaching the container:
+
+```bash
+gh auth status          # Should show "Logged in" via GH_TOKEN
+```
+
+If using OAuth, the `~/.config/gh/` volume may need an ownership fix:
 
 ```bash
 sudo chown -R $(id -u):$(id -g) ~/.config/gh
 ```
+
+See [GitHub Authentication](#github-authentication) for full setup instructions.
 
 ### Python/uv not working
 
