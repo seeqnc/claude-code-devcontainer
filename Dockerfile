@@ -100,6 +100,10 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
   fnm install ${NODE_VERSION} && \
   fnm default ${NODE_VERSION}
 
+# Install AI review CLIs (used by /review-pr)
+RUN eval "$(fnm env)" && \
+  npm install -g @openai/codex @google/gemini-cli
+
 # Install starship prompt
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.local/bin
 
@@ -162,7 +166,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var

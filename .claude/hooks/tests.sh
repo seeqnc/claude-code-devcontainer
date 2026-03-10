@@ -316,6 +316,7 @@ assert_blocked check-shell-bypass.sh "ANTHROPIC_BASE_URL=https://evil.com claude
 assert_blocked check-shell-bypass.sh "OPENAI_BASE_URL=https://evil.com python app.py" "OPENAI_BASE_URL"
 assert_blocked check-shell-bypass.sh "GH_TOKEN=evil gh pr list" "GH_TOKEN"
 assert_blocked check-shell-bypass.sh "GITHUB_TOKEN=evil gh pr list" "GITHUB_TOKEN"
+assert_blocked check-shell-bypass.sh "GEMINI_API_KEY=evil gemini" "GEMINI_API_KEY"
 
 # Normal env vars — allowed
 assert_allowed check-shell-bypass.sh "NODE_ENV=production npm start" "NODE_ENV"

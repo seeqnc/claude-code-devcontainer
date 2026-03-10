@@ -54,3 +54,9 @@ if echo "$CMD" | grep -qE 'GITHUB_TOKEN='; then
 	echo 'BLOCKED: GITHUB_TOKEN= override can hijack GitHub authentication' >&2
 	exit 2
 fi
+
+# GEMINI_API_KEY — block
+if echo "$CMD" | grep -qE 'GEMINI_API_KEY='; then
+	echo 'BLOCKED: GEMINI_API_KEY= override can hijack Gemini authentication' >&2
+	exit 2
+fi

@@ -42,7 +42,7 @@ fi
 
 # --- Unset empty credential vars (localEnv sets "" when unset on host) ---
 if [[ -d /workspace ]]; then
-  for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN; do
+  for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY; do
     [[ -z "${(P)_var}" ]] && unset "$_var"
   done
   unset _var
