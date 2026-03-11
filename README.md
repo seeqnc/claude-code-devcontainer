@@ -188,9 +188,10 @@ API keys set on the host are automatically forwarded into the container:
 | Variable | Service |
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Claude Code (bypasses interactive `claude login`) |
-| `OPENAI_API_KEY` | OpenAI-based plugins and tools |
+| `OPENAI_API_KEY` | OpenAI-based plugins and tools, Codex CLI |
 | `EXA_API_KEY` | Exa AI search |
 | `GH_TOKEN` | GitHub CLI and git HTTPS (see [GitHub Authentication](#github-authentication)) |
+| `GEMINI_API_KEY` | Gemini CLI for PR reviews |
 
 Add them to your host shell profile (e.g., `~/.bashrc`, `~/.zshrc`) so they persist across sessions. Environment variables are read from the host at **container creation time** — if you add or change a key, rebuild the container to pick it up:
 
@@ -202,6 +203,30 @@ devc shell
 ```
 
 If a key is not set on the host, the variable is left unset inside the container so tools fall back to their default auth flow (e.g., `claude login`).
+
+## AI Review CLIs
+
+The container includes [Codex](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google/gemini-cli), used by the `/review-pr` skill to provide independent review perspectives alongside Claude.
+
+**Codex** uses `OPENAI_API_KEY` (already documented above). Get a key from [OpenAI Platform](https://platform.openai.com/api-keys). Verify with:
+
+```bash
+which codex
+```
+
+**Gemini CLI** uses `GEMINI_API_KEY`. Get a key from [Google AI Studio](https://aistudio.google.com/apikey) (free tier: 60 req/min, 1000 req/day). Add it to your host shell profile:
+
+```bash
+export GEMINI_API_KEY=AI...
+```
+
+Rebuild the container to pick it up, then verify:
+
+```bash
+devc rebuild
+devc shell
+gemini --version
+```
 
 ## GitHub Authentication
 
@@ -332,11 +357,11 @@ The container auto-configures `bypassPermissions` mode—Claude runs commands wi
 | Shells | bash (default) and zsh (Oh My Zsh), both with starship prompt |
 | User | `vscode` (passwordless sudo), working dir `/workspace` |
 | Search & nav | `rg`, `fd`, `fzf`, `zoxide` (`j` to jump) |
-| Dev tools | `tmux`, `delta`, `bat`, `eza`, `lazygit`, `ast-grep` |
+| Dev tools | `tmux`, `delta`, `bat`, `eza`, `lazygit`, `ast-grep`, `codex`, `gemini` |
 | Network | `iptables`, `ipset`, `dnsutils` |
 | Volumes (survive rebuilds) | Command history (`/commandhistory`), Claude config (`~/.claude`), GitHub CLI auth (`~/.config/gh`) |
 | Host mounts | `~/.gitconfig`, `.devcontainer/`, `~/.claude/{CLAUDE.md,commands,skills,rules,docs}` (all read-only) |
-| API keys | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY`, `GH_TOKEN` (from host env) |
+| API keys | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `EXA_API_KEY`, `GH_TOKEN`, `GEMINI_API_KEY` (from host env) |
 | Claude plugins | [anthropics](https://github.com/anthropics/claude-code-plugins) + [trailofbits](https://github.com/trailofbits/claude-code-plugins) skills, [everything-claude-code](https://github.com/nicobailon/everything-claude-code) |
 | Dotfiles | Personal aliases, functions, exports, vim config, starship theme |
 

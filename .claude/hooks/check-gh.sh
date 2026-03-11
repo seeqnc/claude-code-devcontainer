@@ -8,6 +8,7 @@ set -euo pipefail
 # Allowed:
 #   gh pr  create|edit|view|list|diff|checks|comment|ready|status
 #   gh issue  view|list|create|comment
+#   gh label  create|edit|view|list
 #   gh repo view
 #   gh api  (GET only, no -X DELETE/PUT/PATCH/POST)
 #
@@ -17,6 +18,9 @@ CMD=$(jq -r '.tool_input.command' | head -1)
 
 # Not a gh command — allow
 echo "$CMD" | grep -qE 'gh[[:space:]]' || exit 0
+
+# Label operations
+echo "$CMD" | grep -qE 'gh[[:space:]]+(label[[:space:]]+(create|edit|view|list))' && exit 0
 
 # PR operations
 echo "$CMD" | grep -qE 'gh[[:space:]]+(pr[[:space:]]+(create|edit|view|list|diff|checks|comment|ready|status))' && exit 0
