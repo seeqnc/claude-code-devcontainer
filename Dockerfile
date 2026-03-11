@@ -30,9 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   vim \
   # Network tools (for security testing)
   dnsutils \
-  ipset \
-  iptables \
-  iproute2 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install git-delta
@@ -101,7 +98,7 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
   fnm default ${NODE_VERSION}
 
 # Install AI review CLIs (used by /review-pr)
-RUN eval "$(fnm env)" && \
+RUN export PATH="$FNM_DIR:$PATH" && eval "$(fnm env)" && \
   npm install -g --ignore-scripts @openai/codex @google/gemini-cli
 
 # Install starship prompt
