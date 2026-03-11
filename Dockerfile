@@ -102,7 +102,7 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
 
 # Install AI review CLIs (used by /review-pr)
 RUN eval "$(fnm env)" && \
-  npm install -g @openai/codex @google/gemini-cli
+  npm install -g --ignore-scripts @openai/codex @google/gemini-cli
 
 # Install starship prompt
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.local/bin

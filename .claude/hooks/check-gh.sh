@@ -8,6 +8,7 @@ set -euo pipefail
 # Allowed:
 #   gh pr  create|edit|view|list|diff|checks|comment|ready|status
 #   gh issue  view|list|create|comment
+#   gh label  create|edit|view|list
 #   gh repo view
 #   gh api  (GET only, no -X DELETE/PUT/PATCH/POST)
 #

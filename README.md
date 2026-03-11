@@ -211,7 +211,7 @@ The container includes [Codex](https://github.com/openai/codex) and [Gemini CLI]
 **Codex** uses `OPENAI_API_KEY` (already documented above). Get a key from [OpenAI Platform](https://platform.openai.com/api-keys). Verify with:
 
 ```bash
-codex --version
+which codex
 ```
 
 **Gemini CLI** uses `GEMINI_API_KEY`. Get a key from [Google AI Studio](https://aistudio.google.com/apikey) (free tier: 60 req/min, 1000 req/day). Add it to your host shell profile:
