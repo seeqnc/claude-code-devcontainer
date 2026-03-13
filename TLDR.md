@@ -76,13 +76,13 @@ The `GH_TOKEN` is a fine-grained PAT scoped to the repos you're working on. This
 
 The Codex CLI uses an Azure-hosted OpenAI endpoint. You need an API key from the Azure portal.
 
-> **Portal link:** [Azure OpenAI resource > Keys and Endpoint](https://portal.azure.com/#@azureseeqnc.onmicrosoft.com/resource/subscriptions/0c63fece-fb6f-4e9b-b4ed-004e55ddc291/resourceGroups/sqnc-claude-code/providers/Microsoft.CognitiveServices/accounts/sqnc-claude-foundry/cskeys)
+> **Portal link:** Go to the [Azure portal](https://portal.azure.com), navigate to your Azure OpenAI resource, then **Keys and Endpoint**.
 >
 > ![Screenshot: Azure portal Keys and Endpoint page](docs/screens/azure-openai-key.png)
 
 Copy either `KEY 1` or `KEY 2`.
 
-You also need the Azure endpoint URL. You get it from me :-)
+You also need the Azure endpoint URL. It's on the same Keys and Endpoint page in the portal — copy the **Endpoint** value.
 
 ## 5. Export env vars and rebuild
 
@@ -95,6 +95,9 @@ export GH_TOKEN=github_pat_...
 # Required for Codex CLI. See instructions above (used by /review-pr)
 export OPENAI_API_KEY=...
 export CODEX_AZURE_BASE_URL=...
+
+# Optional -- override host port for API forwarding (defaults to 8000)
+# export DEVC_API_PORT=9000
 
 # Optional -- only if you're using an API key instead of a subscription
 # Most people should skip this and run `claude login` inside the container
