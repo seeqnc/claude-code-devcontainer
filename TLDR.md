@@ -164,7 +164,7 @@ In short you can yolo through your day without worrying about security. Ok don't
 
 ## 9. Codex CLI and /review-pr
 
-The container comes with [OpenAI Codex CLI](https://github.com/openai/codex) pre-installed and configured to use the Azure OpenAI endpoint. You don't need to set anything up beyond the `OPENAI_API_KEY` from step 4.
+The container comes with [OpenAI Codex CLI](https://github.com/openai/codex) pre-installed and configured to use the Azure OpenAI endpoint. You don't need to set anything up beyond the `OPENAI_API_KEY` and `CODEX_AZURE_BASE_URL` from step 4.
 
 When you run `/review-pr` in Claude, it uses Codex as an independent reviewer. If you also have `GEMINI_API_KEY` set, Gemini CLI adds a third opinion on the same diff.
 
