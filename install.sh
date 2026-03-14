@@ -79,7 +79,8 @@ check_devcontainer_cli() {
 }
 
 load_env_file() {
-  local env_file="$SCRIPT_DIR/.devc.env"
+  local workspace="${1:-.}"
+  local env_file="$workspace/.devc.env"
   if [[ ! -f "$env_file" ]]; then
     return 0
   fi
@@ -284,6 +285,11 @@ cmd_template() {
   cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.bash_profile" "$devcontainer_dir/"
 
+  # Copy .devc.env.example so users know which env vars to set
+  if [[ -f "$SCRIPT_DIR/.devc.env.example" ]]; then
+    cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
+  fi
+
   # Always create .dotfiles/ (Dockerfile COPY requires it to exist)
   mkdir -p "$devcontainer_dir/.dotfiles/.claude"
 
@@ -316,7 +322,7 @@ cmd_up() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
   log_info "Starting devcontainer in $workspace_folder..."
@@ -330,7 +336,7 @@ cmd_rebuild() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
   log_info "Rebuilding devcontainer in $workspace_folder..."
