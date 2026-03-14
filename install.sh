@@ -79,7 +79,8 @@ check_devcontainer_cli() {
 }
 
 load_env_file() {
-  local env_file="$SCRIPT_DIR/.devc.env"
+  local workspace="${1:-.}"
+  local env_file="$workspace/.devc.env"
   if [[ ! -f "$env_file" ]]; then
     return 0
   fi
@@ -115,6 +116,30 @@ check_no_sys_admin() {
 
 get_workspace_folder() {
   echo "${1:-$(pwd)}"
+}
+
+# Inject or remove --publish from runArgs based on DEVC_API_PORT env var.
+# When set, publishes the port on localhost. When unset, removes any --publish
+# entries so containers don't clash (especially across worktrees).
+setup_port_publishing() {
+  local devcontainer_json="$1"
+
+  [[ -f "$devcontainer_json" ]] || return 0
+
+  local updated
+  if [[ -n "${DEVC_API_PORT:-}" ]]; then
+    local publish_arg="--publish=127.0.0.1:${DEVC_API_PORT}:8000"
+    log_info "Publishing port ${DEVC_API_PORT} → container 8000"
+    updated=$(jq --arg pub "$publish_arg" '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not))) + [$pub]
+    ' "$devcontainer_json")
+  else
+    updated=$(jq '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not)))
+    ' "$devcontainer_json")
+  fi
+
+  echo "$updated" >"$devcontainer_json"
 }
 
 # Detect if a workspace is a git worktree and resolve the main .git directory.
@@ -284,6 +309,11 @@ cmd_template() {
   cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.bash_profile" "$devcontainer_dir/"
 
+  # Copy .devc.env.example so users know which env vars to set
+  if [[ -f "$SCRIPT_DIR/.devc.env.example" ]]; then
+    cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
+  fi
+
   # Always create .dotfiles/ (Dockerfile COPY requires it to exist)
   mkdir -p "$devcontainer_dir/.dotfiles/.claude"
 
@@ -316,9 +346,10 @@ cmd_up() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
+  setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
   log_info "Starting devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder"
@@ -330,9 +361,10 @@ cmd_rebuild() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
+  setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
   log_info "Rebuilding devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder" --remove-existing-container
