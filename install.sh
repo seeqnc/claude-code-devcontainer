@@ -85,13 +85,15 @@ load_env_file() {
   fi
   log_info "Loading environment from $env_file"
   # Export non-empty, non-comment lines. Don't override vars already set in the shell.
-  while IFS='=' read -r key value; do
-    [[ -z "$key" || "$key" == \#* ]] && continue
-    # Strip surrounding quotes from value
-    value="${value#\"}"
-    value="${value%\"}"
-    value="${value#\'}"
-    value="${value%\'}"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    # Validate key is a POSIX identifier
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    # Strip matching surrounding quotes from value
+    if [[ "$value" == \"*\" ]]; then value="${value#\"}"; value="${value%\"}"; fi
+    if [[ "$value" == \'*\' ]]; then value="${value#\'}"; value="${value%\'}"; fi
     if [[ -z "${!key:-}" && -n "$value" ]]; then
       export "$key=$value"
     fi
