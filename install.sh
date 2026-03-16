@@ -128,6 +128,10 @@ setup_port_publishing() {
 
   local updated
   if [[ -n "${DEVC_API_PORT:-}" ]]; then
+    if ! [[ "$DEVC_API_PORT" =~ ^[0-9]+$ ]] || (( DEVC_API_PORT < 1 || DEVC_API_PORT > 65535 )); then
+      log_error "DEVC_API_PORT must be a port number (1-65535), got: $DEVC_API_PORT"
+      exit 1
+    fi
     local publish_arg="--publish=127.0.0.1:${DEVC_API_PORT}:8000"
     log_info "Publishing port ${DEVC_API_PORT} → container 8000"
     updated=$(jq --arg pub "$publish_arg" '
