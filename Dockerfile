@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install project-specific packages (passed via --build-arg from .devc.packages)
+# $EXTRA_PACKAGES is intentionally unquoted for word-splitting. Package names are
+# validated by setup_extra_packages before build. Do not pass directly via --build-arg.
 ARG EXTRA_PACKAGES=""
 RUN if [ -n "$EXTRA_PACKAGES" ]; then \
   apt-get update && apt-get install -y --no-install-recommends $EXTRA_PACKAGES \

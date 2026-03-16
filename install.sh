@@ -138,13 +138,14 @@ setup_port_publishing() {
     log_info "Publishing port ${DEVC_API_PORT} → container 8000"
     updated=$(jq --arg pub "$publish_arg" '
       .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not))) + [$pub]
-    ' "$devcontainer_json")
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
   else
     updated=$(jq '
       .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not)))
-    ' "$devcontainer_json")
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
   fi
 
+  [[ -n "$updated" ]] || { log_error "jq produced empty output for $devcontainer_json"; return 1; }
   echo "$updated" >"$devcontainer_json"
 }
 
@@ -171,14 +172,17 @@ setup_extra_packages() {
     done <"$packages_file"
   fi
 
-  if [[ -n "$packages" ]]; then
-    log_info "Extra packages: $packages"
+  if [[ -z "$packages" ]]; then
+    return 0
   fi
+
+  log_info "Extra packages: $packages"
 
   local updated
   updated=$(jq --arg pkgs "$packages" '
     .build.args.EXTRA_PACKAGES = $pkgs
-  ' "$devcontainer_json")
+  ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  [[ -n "$updated" ]] || { log_error "jq produced empty output for $devcontainer_json"; return 1; }
   echo "$updated" >"$devcontainer_json"
 }
 
@@ -479,11 +483,15 @@ cmd_env() {
     GEMINI_API_KEY
   )
 
-  # Build a shell snippet that prints KEY=VALUE for each non-empty var
-  local script='for v in '"${vars[*]}"'; do val="${!v}"; [ -n "$val" ] && echo "$v=$val"; done'
+  # Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var
+  # shellcheck disable=SC2016  # single quotes intentional; script runs inside the container
+  local script='for v in "$@"; do val="${!v}"; [ -n "$val" ] && printf "%s=%s\n" "$v" "$val"; done'
 
   local output
-  output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" 2>/dev/null)
+  if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>&1); then
+    log_error "Failed to exec into container. Is it running? (devc up)"
+    exit 1
+  fi
 
   # Print header
   cat <<'HEADER'
@@ -495,10 +503,10 @@ HEADER
   # Print captured vars
   if [[ -n "$output" ]]; then
     echo "$output"
+    echo ""
   fi
 
   # DEVC_API_PORT is host-side only, can't be read from container
-  echo ""
   echo "# Optional — expose container port 8000 on this host port (omit to skip)"
   echo "# DEVC_API_PORT=8000"
 }
