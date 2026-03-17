@@ -475,7 +475,7 @@ cmd_upgrade() {
 
 cmd_env() {
   local workspace_folder
-  workspace_folder="$(get_workspace_folder)"
+  workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
 
@@ -494,10 +494,15 @@ cmd_env() {
   local script='for v in "$@"; do val="${!v}"; [ -n "$val" ] && printf "%s=%s\n" "$v" "$val"; done'
 
   local output
-  if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>&1); then
+  local exec_stderr
+  exec_stderr=$(mktemp)
+  if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>"$exec_stderr"); then
     log_error "Failed to exec into container. Is it running? (devc up)"
+    log_error "$(cat "$exec_stderr")"
+    rm -f "$exec_stderr"
     exit 1
   fi
+  rm -f "$exec_stderr"
 
   # Print header
   cat <<'HEADER'
