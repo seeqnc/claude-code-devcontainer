@@ -496,13 +496,12 @@ cmd_env() {
   local output
   local exec_stderr
   exec_stderr=$(mktemp)
+  trap 'rm -f "$exec_stderr"' RETURN
   if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>"$exec_stderr"); then
     log_error "Failed to exec into container. Is it running? (devc up)"
     log_error "$(cat "$exec_stderr")"
-    rm -f "$exec_stderr"
     exit 1
   fi
-  rm -f "$exec_stderr"
 
   # Print header
   cat <<'HEADER'
@@ -1052,7 +1051,7 @@ main() {
     cmd_upgrade
     ;;
   env)
-    cmd_env
+    cmd_env "$@"
     ;;
   mount)
     cmd_mount "$@"
