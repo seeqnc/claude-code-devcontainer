@@ -329,6 +329,32 @@ trust_level = "trusted"
     print(f"[post_install] Codex config created: {config_file}", file=sys.stderr)
 
 
+def setup_exa_mcp():
+    """Register Exa AI as a Claude MCP server for web search.
+
+    Requires EXA_API_KEY to be set. Skips silently if the key is missing.
+    """
+    api_key = os.environ.get("EXA_API_KEY")
+    if not api_key:
+        print("[post_install] EXA_API_KEY not set, skipping Exa MCP setup", file=sys.stderr)
+        return
+
+    url = f"https://mcp.exa.ai/mcp?exaApiKey={api_key}"
+    try:
+        subprocess.run(
+            ["claude", "mcp", "add", "--transport", "http", "exa", url],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        print("[post_install] Exa MCP server registered", file=sys.stderr)
+    except FileNotFoundError:
+        print("[post_install] Warning: claude CLI not found, skipping Exa MCP setup", file=sys.stderr)
+    except subprocess.CalledProcessError as e:
+        error_detail = e.stderr or f"exit code {e.returncode}"
+        print(f"[post_install] Warning: Failed to register Exa MCP: {error_detail}", file=sys.stderr)
+
+
 def validate_git_worktree():
     """Check if workspace is a git worktree and verify the git dir is accessible."""
     git_file = Path("/workspace/.git")
@@ -362,6 +388,7 @@ def main():
     setup_global_gitignore()
     setup_gh_credential_helper()
     setup_codex_config()
+    setup_exa_mcp()
     validate_git_worktree()
 
     print("[post_install] Configuration complete!", file=sys.stderr)

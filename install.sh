@@ -37,6 +37,7 @@ Commands:
     exec <cmd>          Execute a command in the running container
     upgrade             Upgrade Claude Code to latest version
     mount <host> <cont> Add a mount to the devcontainer (recreates container)
+    env                 Print .devc.env from running container's env vars
     sync [project] [--trusted]  Sync sessions from devcontainers to host
     cp <cont> <host>    Copy files/directories from container to host
     destroy [-f]        Remove container, volumes, and image for current project
@@ -52,6 +53,7 @@ Examples:
     devc exec ls -la            # Run command in container
     devc upgrade                # Upgrade Claude Code to latest
     devc mount ~/data /data     # Add mount to container
+    devc env > .devc.env        # Capture env vars from running container
     devc sync                   # Sync sessions from all devcontainers
     devc sync crypto            # Sync only matching devcontainer
     devc cp /some/file ./out    # Copy a path from container to host
@@ -85,7 +87,8 @@ check_devcontainer_cli() {
 }
 
 load_env_file() {
-  local env_file="$SCRIPT_DIR/.devc.env"
+  local workspace="${1:-.}"
+  local env_file="$workspace/.devc.env"
   if [[ ! -f "$env_file" ]]; then
     return 0
   fi
@@ -121,6 +124,72 @@ check_no_sys_admin() {
 
 get_workspace_folder() {
   echo "${1:-$(pwd)}"
+}
+
+# Inject or remove --publish from runArgs based on DEVC_API_PORT env var.
+# When set, publishes the port on localhost. When unset, removes any --publish
+# entries so containers don't clash (especially across worktrees).
+setup_port_publishing() {
+  local devcontainer_json="$1"
+
+  [[ -f "$devcontainer_json" ]] || return 0
+
+  local updated
+  if [[ -n "${DEVC_API_PORT:-}" ]]; then
+    if ! [[ "$DEVC_API_PORT" =~ ^[0-9]+$ ]] || (( DEVC_API_PORT < 1 || DEVC_API_PORT > 65535 )); then
+      log_error "DEVC_API_PORT must be a port number (1-65535), got: $DEVC_API_PORT"
+      exit 1
+    fi
+    local publish_arg="--publish=127.0.0.1:${DEVC_API_PORT}:8000"
+    log_info "Publishing port ${DEVC_API_PORT} → container 8000"
+    updated=$(jq --arg pub "$publish_arg" '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not))) + [$pub]
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  else
+    updated=$(jq '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not)))
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  fi
+
+  [[ -n "$updated" ]] || { log_error "jq produced empty output for $devcontainer_json"; return 1; }
+  echo "$updated" >"$devcontainer_json"
+}
+
+# Read .devc.packages from workspace and inject as EXTRA_PACKAGES build arg.
+# Packages are installed in a separate cached Dockerfile layer.
+setup_extra_packages() {
+  local workspace="$1"
+  local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+  local packages_file="$workspace/.devc.packages"
+
+  [[ -f "$devcontainer_json" ]] || return 0
+
+  local packages=""
+  if [[ -f "$packages_file" ]]; then
+    # Read non-empty, non-comment lines into a space-separated string
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -z "$line" || "$line" == \#* ]] && continue
+      # Validate package name (alphanumeric, hyphens, dots, colons, plus signs)
+      if [[ "$line" =~ ^[a-zA-Z0-9][a-zA-Z0-9.+:_-]*$ ]]; then
+        packages="${packages:+$packages }$line"
+      else
+        log_warn "Skipping invalid package name: $line"
+      fi
+    done <"$packages_file"
+  fi
+
+  if [[ -z "$packages" ]]; then
+    return 0
+  fi
+
+  log_info "Extra packages: $packages"
+
+  local updated
+  updated=$(jq --arg pkgs "$packages" '
+    .build.args.EXTRA_PACKAGES = $pkgs
+  ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  [[ -n "$updated" ]] || { log_error "jq produced empty output for $devcontainer_json"; return 1; }
+  echo "$updated" >"$devcontainer_json"
 }
 
 # Detect if a workspace is a git worktree and resolve the main .git directory.
@@ -290,6 +359,11 @@ cmd_template() {
   cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
   cp "$SCRIPT_DIR/.bash_profile" "$devcontainer_dir/"
 
+  # Copy .devc.env.example so users know which env vars to set
+  if [[ -f "$SCRIPT_DIR/.devc.env.example" ]]; then
+    cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
+  fi
+
   # Always create .dotfiles/ (Dockerfile COPY requires it to exist)
   mkdir -p "$devcontainer_dir/.dotfiles/.claude"
 
@@ -322,9 +396,11 @@ cmd_up() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
+  setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
+  setup_extra_packages "$workspace_folder"
   log_info "Starting devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder"
@@ -336,9 +412,11 @@ cmd_rebuild() {
   workspace_folder="$(get_workspace_folder "${1:-}")"
 
   check_devcontainer_cli
-  load_env_file
+  load_env_file "$workspace_folder"
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
+  setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
+  setup_extra_packages "$workspace_folder"
   log_info "Rebuilding devcontainer in $workspace_folder..."
 
   devcontainer up --workspace-folder "$workspace_folder" --remove-existing-container
@@ -393,6 +471,50 @@ cmd_upgrade() {
   devcontainer exec --workspace-folder "$workspace_folder" claude update
 
   log_success "Claude Code upgraded"
+}
+
+cmd_env() {
+  local workspace_folder
+  workspace_folder="$(get_workspace_folder)"
+
+  check_devcontainer_cli
+
+  # Env vars to export — must match .devc.env.example
+  local vars=(
+    GH_TOKEN
+    OPENAI_API_KEY
+    CODEX_AZURE_BASE_URL
+    ANTHROPIC_API_KEY
+    EXA_API_KEY
+    GEMINI_API_KEY
+  )
+
+  # Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var
+  # shellcheck disable=SC2016  # single quotes intentional; script runs inside the container
+  local script='for v in "$@"; do val="${!v}"; [ -n "$val" ] && printf "%s=%s\n" "$v" "$val"; done'
+
+  local output
+  if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>&1); then
+    log_error "Failed to exec into container. Is it running? (devc up)"
+    exit 1
+  fi
+
+  # Print header
+  cat <<'HEADER'
+# Devcontainer environment variables
+# Generated by: devc env
+# NEVER commit this file — it is gitignored.
+HEADER
+
+  # Print captured vars
+  if [[ -n "$output" ]]; then
+    echo "$output"
+    echo ""
+  fi
+
+  # DEVC_API_PORT is host-side only, can't be read from container
+  echo "# Optional — expose container port 8000 on this host port (omit to skip)"
+  echo "# DEVC_API_PORT=8000"
 }
 
 cmd_mount() {
@@ -923,6 +1045,9 @@ main() {
     ;;
   upgrade)
     cmd_upgrade
+    ;;
+  env)
+    cmd_env
     ;;
   mount)
     cmd_mount "$@"
