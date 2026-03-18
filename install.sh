@@ -491,17 +491,18 @@ cmd_env() {
 
   # Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var
   # shellcheck disable=SC2016  # single quotes intentional; script runs inside the container
-  local script='for v in "$@"; do val="${!v}"; [ -n "$val" ] && printf "%s=%s\n" "$v" "$val"; done'
+  local script='for v in "$@"; do val="${!v}"; [ -n "$val" ] && printf "%s=%s\n" "$v" "$val"; done; true'
 
   local output
   local exec_stderr
   exec_stderr=$(mktemp)
-  trap 'rm -f "$exec_stderr"' RETURN
   if ! output=$(devcontainer exec --workspace-folder "$workspace_folder" bash -c "$script" -- "${vars[@]}" 2>"$exec_stderr"); then
     log_error "Failed to exec into container. Is it running? (devc up)"
     log_error "$(cat "$exec_stderr")"
+    rm -f "$exec_stderr"
     exit 1
   fi
+  rm -f "$exec_stderr"
 
   # Print header
   cat <<'HEADER'
