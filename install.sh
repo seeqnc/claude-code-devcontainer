@@ -126,6 +126,37 @@ get_workspace_folder() {
   echo "${1:-$(pwd)}"
 }
 
+# Inject or remove --gpus from runArgs based on DEVC_GPU env var.
+# Accepts: "all" or a positive integer (number of GPUs to expose).
+# When unset, removes any --gpus entries from runArgs.
+setup_gpu_passthrough() {
+  local devcontainer_json="$1"
+
+  [[ -f "$devcontainer_json" ]] || return 0
+
+  local updated
+  if [[ -n "${DEVC_GPU:-}" ]]; then
+    if [[ "$DEVC_GPU" != "all" ]]; then
+      if ! [[ "$DEVC_GPU" =~ ^[1-9][0-9]*$ ]]; then
+        log_error "DEVC_GPU must be 'all' or a positive integer, got: $DEVC_GPU"
+        exit 1
+      fi
+    fi
+    local gpus_arg="--gpus=${DEVC_GPU}"
+    log_info "GPU passthrough: ${DEVC_GPU}"
+    updated=$(jq --arg gpu "$gpus_arg" '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not))) + [$gpu]
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  else
+    updated=$(jq '
+      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not)))
+    ' "$devcontainer_json") || { log_error "jq failed updating $devcontainer_json"; return 1; }
+  fi
+
+  [[ -n "$updated" ]] || { log_error "jq produced empty output for $devcontainer_json"; return 1; }
+  echo "$updated" >"$devcontainer_json"
+}
+
 # Inject or remove --publish from runArgs based on DEVC_API_PORT env var.
 # When set, publishes the port on localhost. When unset, removes any --publish
 # entries so containers don't clash (especially across worktrees).
@@ -400,6 +431,7 @@ cmd_up() {
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
   setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
+  setup_gpu_passthrough "$workspace_folder/.devcontainer/devcontainer.json"
   setup_extra_packages "$workspace_folder"
   log_info "Starting devcontainer in $workspace_folder..."
 
@@ -416,6 +448,7 @@ cmd_rebuild() {
   check_no_sys_admin "$workspace_folder"
   setup_worktree_mount "$workspace_folder"
   setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
+  setup_gpu_passthrough "$workspace_folder/.devcontainer/devcontainer.json"
   setup_extra_packages "$workspace_folder"
   log_info "Rebuilding devcontainer in $workspace_folder..."
 
@@ -517,9 +550,12 @@ HEADER
     echo ""
   fi
 
-  # DEVC_API_PORT is host-side only, can't be read from container
+  # Host-side only vars — consumed by devc before container start
   echo "# Optional — expose container port 8000 on this host port (omit to skip)"
   echo "# DEVC_API_PORT=8000"
+  echo ""
+  echo "# Optional — GPU passthrough: \"all\" or number of GPUs (requires NVIDIA Container Toolkit)"
+  echo "# DEVC_GPU=all"
 }
 
 cmd_mount() {
