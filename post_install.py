@@ -2,7 +2,9 @@
 """Post-install configuration for Claude Code devcontainer.
 
 Runs on container creation to set up:
+- Global CLAUDE.md and docs (from host ~/.claude or workspace fallback)
 - Claude settings (bypassPermissions mode)
+- Git config (inlined host config, global gitignore, delta, credential helper)
 - Tmux configuration (200k history, mouse support)
 - Directory ownership fixes for mounted volumes
 """
@@ -116,16 +118,26 @@ def setup_global_claude_md():
         content = host_claude_md.read_text(encoding="utf-8").strip()
         if content:
             source = host_claude_md
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError as e:
+        print(
+            f"[post_install] Warning: could not read {host_claude_md}: {e}",
+            file=sys.stderr,
+        )
 
     if source is None:
         try:
             content = workspace_claude_md.read_text(encoding="utf-8").strip()
             if content:
                 source = workspace_claude_md
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError as e:
+            print(
+                f"[post_install] Warning: could not read {workspace_claude_md}: {e}",
+                file=sys.stderr,
+            )
 
     if source is not None:
         try:
@@ -155,8 +167,12 @@ def setup_global_claude_md():
     try:
         if host_docs.is_dir() and any(host_docs.iterdir()):
             docs_source = host_docs
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError as e:
+        print(
+            f"[post_install] Warning: could not read {host_docs}: {e}", file=sys.stderr
+        )
     try:
         if (
             docs_source is None
@@ -164,12 +180,23 @@ def setup_global_claude_md():
             and any(workspace_docs.iterdir())
         ):
             docs_source = workspace_docs
-    except OSError:
+    except FileNotFoundError:
         pass
+    except OSError as e:
+        print(
+            f"[post_install] Warning: could not read {workspace_docs}: {e}",
+            file=sys.stderr,
+        )
 
     if docs_source is not None:
         if target_docs.exists():
-            shutil.rmtree(target_docs)
+            try:
+                shutil.rmtree(target_docs)
+            except OSError as e:
+                print(
+                    f"[post_install] Warning: failed to clean docs dir: {e}",
+                    file=sys.stderr,
+                )
         target_docs.mkdir(parents=True, exist_ok=True)
         for src_file in docs_source.rglob("*"):
             if src_file.is_file():
@@ -354,23 +381,32 @@ node_modules/
         existing = gitignore.read_text(encoding="utf-8")
     except OSError:
         existing = ""
-    if existing:
+    if existing and "# Container defaults" not in existing:
         existing_patterns = {
-            ln for ln in existing.splitlines() if ln and not ln.startswith("#")
+            ln.strip()
+            for ln in existing.splitlines()
+            if ln.strip() and not ln.startswith("#")
         }
-        new_lines = [
+        new_patterns = [
             ln
             for ln in patterns.splitlines()
-            if not ln or ln.startswith("#") or ln not in existing_patterns
+            if ln.strip()
+            and not ln.startswith("#")
+            and ln.strip() not in existing_patterns
         ]
-        combined = (
-            existing.rstrip("\n")
-            + "\n\n# Container defaults\n"
-            + "\n".join(new_lines)
-            + "\n"
-        )
-    else:
+        if new_patterns:
+            combined = (
+                existing.rstrip("\n")
+                + "\n\n# Container defaults\n"
+                + "\n".join(new_patterns)
+                + "\n"
+            )
+        else:
+            combined = existing
+    elif not existing:
         combined = patterns
+    else:
+        combined = existing
     gitignore.write_text(combined, encoding="utf-8")
     print(f"[post_install] Global gitignore created: {gitignore}", file=sys.stderr)
 
@@ -380,14 +416,20 @@ node_modules/
     # (git recognizes ~/.gitconfig as the default global path and re-enters).
     try:
         host_raw = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
-    except OSError:
+    except FileNotFoundError:
+        host_raw = ""
+    except OSError as e:
+        print(
+            f"[post_install] Warning: could not read host gitconfig {host_gitconfig}: {e}",
+            file=sys.stderr,
+        )
         host_raw = ""
 
     # Strip the self-referencing include of .gitconfig.local to prevent circular
     # include: host .gitconfig includes .gitconfig.local, which IS this file.
     # First remove just the path line, then clean up any empty [include] sections.
     host_content = re.sub(
-        r"(?m)^\s*path\s*=\s*~/?\.gitconfig\.local\s*$",
+        r'(?m)^\s*path\s*=\s*"?(?:~/?|/.*/)?\.gitconfig\.local"?\s*$',
         "",
         host_raw,
     )
