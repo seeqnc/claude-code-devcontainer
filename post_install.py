@@ -9,6 +9,8 @@ Runs on container creation to set up:
 
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -117,7 +119,6 @@ def setup_global_claude_md():
 
     if source is not None:
         try:
-            import shutil
             shutil.copy2(source, target_claude_md)
             label = "host" if source == host_claude_md else "workspace"
             print(f"[post_install] Global CLAUDE.md installed from {label}: {source}", file=sys.stderr)
@@ -136,7 +137,6 @@ def setup_global_claude_md():
         docs_source = workspace_docs
 
     if docs_source is not None:
-        import shutil
         target_docs.mkdir(parents=True, exist_ok=True)
         for src_file in docs_source.rglob("*"):
             if src_file.is_file():
@@ -324,9 +324,17 @@ node_modules/
     # pointing to this file + including ~/.gitconfig creates a circular include
     # (git recognizes ~/.gitconfig as the default global path and re-enters).
     try:
-        host_content = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
+        host_raw = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
     except OSError:
-        host_content = ""
+        host_raw = ""
+
+    # Strip [include] of .gitconfig.local from host content to prevent circular
+    # include: host .gitconfig includes .gitconfig.local, which IS this file.
+    host_content = re.sub(
+        r"(?m)^\[include\]\s*\n\s*path\s*=\s*~/?\.gitconfig\.local\s*$",
+        "",
+        host_raw,
+    ).strip()
 
     # Build by concatenation — not f-string — because host_content may contain
     # curly braces (shell variables in git aliases, hook commands, etc.).
