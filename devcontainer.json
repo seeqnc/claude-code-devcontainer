@@ -48,11 +48,11 @@
     "source=devc-${localWorkspaceFolderBasename}-gh,target=/home/vscode/.config/gh,type=volume",
     "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly",
     "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,readonly",
-    "source=${localEnv:HOME}/.claude/CLAUDE.md,target=/home/vscode/.claude/CLAUDE.md,type=bind,readonly",
+    "source=${localEnv:HOME}/.claude/CLAUDE.md,target=/opt/host-claude/CLAUDE.md,type=bind,readonly",
+    "source=${localEnv:HOME}/.claude/docs,target=/opt/host-claude/docs,type=bind,readonly",
     "source=${localEnv:HOME}/.claude/commands,target=/home/vscode/.claude/commands,type=bind,readonly",
     "source=${localEnv:HOME}/.claude/skills,target=/home/vscode/.claude/skills,type=bind,readonly",
-    "source=${localEnv:HOME}/.claude/rules,target=/home/vscode/.claude/rules,type=bind,readonly",
-    "source=${localEnv:HOME}/.claude/docs,target=/home/vscode/.claude/docs,type=bind,readonly"
+    "source=${localEnv:HOME}/.claude/rules,target=/home/vscode/.claude/rules,type=bind,readonly"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
@@ -75,7 +75,7 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}"
   },
-  "initializeCommand": "test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\" && mkdir -p \"$HOME/.claude\" && test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\" && mkdir -p \"$HOME/.claude/commands\" \"$HOME/.claude/skills\" \"$HOME/.claude/rules\" \"$HOME/.claude/docs\"",
+  "initializeCommand": "test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\" && mkdir -p \"$HOME/.claude/commands\" \"$HOME/.claude/skills\" \"$HOME/.claude/rules\" \"$HOME/.claude/docs\" && test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\"",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
   "postCreateCommand": "uv run --no-project /opt/post_install.py"
