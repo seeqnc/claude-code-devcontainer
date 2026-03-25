@@ -29,7 +29,10 @@ def setup_claude_settings():
         try:
             settings = json.loads(settings_file.read_text())
         except json.JSONDecodeError as e:
-            print(f"[post_install] Warning: corrupt {settings_file}, resetting: {e}", file=sys.stderr)
+            print(
+                f"[post_install] Warning: corrupt {settings_file}, resetting: {e}",
+                file=sys.stderr,
+            )
 
     # Set bypassPermissions mode
     if "permissions" not in settings:
@@ -37,7 +40,9 @@ def setup_claude_settings():
     settings["permissions"]["defaultMode"] = "bypassPermissions"
 
     settings_file.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    print(f"[post_install] Claude settings configured: {settings_file}", file=sys.stderr)
+    print(
+        f"[post_install] Claude settings configured: {settings_file}", file=sys.stderr
+    )
 
 
 def setup_tmux_config():
@@ -121,9 +126,20 @@ def setup_global_claude_md():
         try:
             shutil.copy2(source, target_claude_md)
             label = "host" if source == host_claude_md else "workspace"
-            print(f"[post_install] Global CLAUDE.md installed from {label}: {source}", file=sys.stderr)
+            print(
+                f"[post_install] Global CLAUDE.md installed from {label}: {source}",
+                file=sys.stderr,
+            )
         except OSError as e:
-            print(f"[post_install] Warning: failed to copy CLAUDE.md: {e}", file=sys.stderr)
+            print(
+                f"[post_install] Warning: failed to copy CLAUDE.md: {e}",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            "[post_install] No CLAUDE.md found (checked host and workspace), skipping",
+            file=sys.stderr,
+        )
 
     # docs/: prefer host, fall back to workspace
     host_docs = Path("/opt/host-claude/docs")
@@ -131,12 +147,24 @@ def setup_global_claude_md():
     target_docs = claude_dir / "docs"
 
     docs_source = None
-    if host_docs.is_dir() and any(host_docs.iterdir()):
-        docs_source = host_docs
-    elif workspace_docs.is_dir() and any(workspace_docs.iterdir()):
-        docs_source = workspace_docs
+    try:
+        if host_docs.is_dir() and any(host_docs.iterdir()):
+            docs_source = host_docs
+    except OSError:
+        pass
+    try:
+        if (
+            docs_source is None
+            and workspace_docs.is_dir()
+            and any(workspace_docs.iterdir())
+        ):
+            docs_source = workspace_docs
+    except OSError:
+        pass
 
     if docs_source is not None:
+        if target_docs.exists():
+            shutil.rmtree(target_docs)
         target_docs.mkdir(parents=True, exist_ok=True)
         for src_file in docs_source.rglob("*"):
             if src_file.is_file():
@@ -145,7 +173,10 @@ def setup_global_claude_md():
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_file, dest)
         label = "host" if docs_source == host_docs else "workspace"
-        print(f"[post_install] Global docs installed from {label}: {docs_source}", file=sys.stderr)
+        print(
+            f"[post_install] Global docs installed from {label}: {docs_source}",
+            file=sys.stderr,
+        )
 
 
 def fix_directory_ownership():
@@ -170,7 +201,9 @@ def fix_directory_ownership():
                         check=True,
                         capture_output=True,
                     )
-                    print(f"[post_install] Fixed ownership: {dir_path}", file=sys.stderr)
+                    print(
+                        f"[post_install] Fixed ownership: {dir_path}", file=sys.stderr
+                    )
             except (PermissionError, subprocess.CalledProcessError) as e:
                 print(
                     f"[post_install] Warning: Could not fix ownership of {dir_path}: {e}",
@@ -210,7 +243,10 @@ def setup_claude_settings_from_dotfiles():
     try:
         override = json.loads(staged.read_text())
     except json.JSONDecodeError as e:
-        print(f"[post_install] Warning: corrupt {staged}, skipping merge: {e}", file=sys.stderr)
+        print(
+            f"[post_install] Warning: corrupt {staged}, skipping merge: {e}",
+            file=sys.stderr,
+        )
 
     if not override:
         return
@@ -221,7 +257,10 @@ def setup_claude_settings_from_dotfiles():
         try:
             existing = json.loads(settings_file.read_text())
         except json.JSONDecodeError as e:
-            print(f"[post_install] Warning: corrupt {settings_file}, starting fresh: {e}", file=sys.stderr)
+            print(
+                f"[post_install] Warning: corrupt {settings_file}, starting fresh: {e}",
+                file=sys.stderr,
+            )
 
     merged = deep_merge(existing, override)
     settings_file.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
@@ -306,14 +345,19 @@ node_modules/
         existing = ""
     if existing:
         existing_patterns = {
-            ln for ln in existing.splitlines()
-            if ln and not ln.startswith("#")
+            ln for ln in existing.splitlines() if ln and not ln.startswith("#")
         }
         new_lines = [
-            ln for ln in patterns.splitlines()
+            ln
+            for ln in patterns.splitlines()
             if not ln or ln.startswith("#") or ln not in existing_patterns
         ]
-        combined = existing.rstrip("\n") + "\n\n# Container defaults\n" + "\n".join(new_lines) + "\n"
+        combined = (
+            existing.rstrip("\n")
+            + "\n\n# Container defaults\n"
+            + "\n".join(new_lines)
+            + "\n"
+        )
     else:
         combined = patterns
     gitignore.write_text(combined, encoding="utf-8")
@@ -328,12 +372,18 @@ node_modules/
     except OSError:
         host_raw = ""
 
-    # Strip [include] of .gitconfig.local from host content to prevent circular
+    # Strip the self-referencing include of .gitconfig.local to prevent circular
     # include: host .gitconfig includes .gitconfig.local, which IS this file.
+    # First remove just the path line, then clean up any empty [include] sections.
     host_content = re.sub(
-        r"(?m)^\[include\]\s*\n\s*path\s*=\s*~/?\.gitconfig\.local\s*$",
+        r"(?m)^\s*path\s*=\s*~/?\.gitconfig\.local\s*$",
         "",
         host_raw,
+    )
+    host_content = re.sub(
+        r"(?m)^\[include\]\s*\n(?=\[|\Z)",
+        "",
+        host_content,
     ).strip()
 
     # Build by concatenation — not f-string — because host_content may contain
@@ -362,7 +412,9 @@ node_modules/
         + "    program = /usr/bin/ssh-keygen\n"
     )
     local_gitconfig.write_text(local_config, encoding="utf-8")
-    print(f"[post_install] Local git config created: {local_gitconfig}", file=sys.stderr)
+    print(
+        f"[post_install] Local git config created: {local_gitconfig}", file=sys.stderr
+    )
 
 
 def setup_gh_credential_helper():
@@ -374,13 +426,19 @@ def setup_gh_credential_helper():
     """
     local_gitconfig = Path.home() / ".gitconfig.local"
     if not local_gitconfig.exists():
-        print("[post_install] No .gitconfig.local found, skipping gh credential helper", file=sys.stderr)
+        print(
+            "[post_install] No .gitconfig.local found, skipping gh credential helper",
+            file=sys.stderr,
+        )
         return
 
     content = local_gitconfig.read_text(encoding="utf-8")
     marker = '[credential "https://github.com"]'
     if marker in content:
-        print("[post_install] gh credential helper already configured, skipping", file=sys.stderr)
+        print(
+            "[post_install] gh credential helper already configured, skipping",
+            file=sys.stderr,
+        )
         return
 
     block = f"""
@@ -389,7 +447,10 @@ def setup_gh_credential_helper():
     helper = !/usr/bin/gh auth git-credential
 """
     local_gitconfig.write_text(content + block, encoding="utf-8")
-    print(f"[post_install] gh credential helper configured: {local_gitconfig}", file=sys.stderr)
+    print(
+        f"[post_install] gh credential helper configured: {local_gitconfig}",
+        file=sys.stderr,
+    )
 
 
 def setup_codex_config():
@@ -409,7 +470,10 @@ def setup_codex_config():
 
     base_url = os.environ.get("CODEX_AZURE_BASE_URL")
     if not base_url:
-        print("[post_install] CODEX_AZURE_BASE_URL not set, skipping Codex config", file=sys.stderr)
+        print(
+            "[post_install] CODEX_AZURE_BASE_URL not set, skipping Codex config",
+            file=sys.stderr,
+        )
         return
 
     config = f"""\
@@ -439,7 +503,10 @@ def setup_exa_mcp():
     """
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
-        print("[post_install] EXA_API_KEY not set, skipping Exa MCP setup", file=sys.stderr)
+        print(
+            "[post_install] EXA_API_KEY not set, skipping Exa MCP setup",
+            file=sys.stderr,
+        )
         return
 
     url = f"https://mcp.exa.ai/mcp?exaApiKey={api_key}"
@@ -452,13 +519,22 @@ def setup_exa_mcp():
         )
         print("[post_install] Exa MCP server registered", file=sys.stderr)
     except FileNotFoundError:
-        print("[post_install] Warning: claude CLI not found, skipping Exa MCP setup", file=sys.stderr)
+        print(
+            "[post_install] Warning: claude CLI not found, skipping Exa MCP setup",
+            file=sys.stderr,
+        )
     except subprocess.CalledProcessError as e:
         error_detail = e.stderr.strip() if e.stderr else f"exit code {e.returncode}"
         if "already exists" in error_detail:
-            print("[post_install] Info: Exa MCP server already registered, skipping", file=sys.stderr)
+            print(
+                "[post_install] Info: Exa MCP server already registered, skipping",
+                file=sys.stderr,
+            )
         else:
-            print(f"[post_install] Warning: Failed to register Exa MCP: {error_detail}", file=sys.stderr)
+            print(
+                f"[post_install] Warning: Failed to register Exa MCP: {error_detail}",
+                file=sys.stderr,
+            )
 
 
 def validate_git_worktree():
