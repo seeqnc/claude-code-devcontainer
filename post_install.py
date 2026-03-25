@@ -85,6 +85,69 @@ set -g status-right '%Y-%m-%d %H:%M'
     print(f"[post_install] Tmux configured: {tmux_conf}", file=sys.stderr)
 
 
+def setup_global_claude_md():
+    """Populate ~/.claude/CLAUDE.md and ~/.claude/docs from host or workspace fallback.
+
+    The host's ~/.claude/CLAUDE.md and ~/.claude/docs are bind-mounted read-only
+    to /opt/host-claude/ (staging). If the host file has content, it is copied to
+    ~/.claude/CLAUDE.md (on the writable volume). If empty or missing, the
+    workspace's .claude/CLAUDE.md is used as fallback — providing global development
+    standards even when the host has no CLAUDE.md.
+
+    Same logic applies to docs/: host docs win, workspace docs are the fallback.
+    """
+    claude_dir = Path.home() / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    host_claude_md = Path("/opt/host-claude/CLAUDE.md")
+    workspace_claude_md = Path("/workspace/.claude/CLAUDE.md")
+    target_claude_md = claude_dir / "CLAUDE.md"
+
+    # CLAUDE.md: prefer host, fall back to workspace
+    source = None
+    try:
+        content = host_claude_md.read_text(encoding="utf-8").strip()
+        if content:
+            source = host_claude_md
+    except OSError:
+        pass
+
+    if source is None and workspace_claude_md.exists():
+        source = workspace_claude_md
+
+    if source is not None:
+        try:
+            import shutil
+            shutil.copy2(source, target_claude_md)
+            label = "host" if source == host_claude_md else "workspace"
+            print(f"[post_install] Global CLAUDE.md installed from {label}: {source}", file=sys.stderr)
+        except OSError as e:
+            print(f"[post_install] Warning: failed to copy CLAUDE.md: {e}", file=sys.stderr)
+
+    # docs/: prefer host, fall back to workspace
+    host_docs = Path("/opt/host-claude/docs")
+    workspace_docs = Path("/workspace/.claude/docs")
+    target_docs = claude_dir / "docs"
+
+    docs_source = None
+    if host_docs.is_dir() and any(host_docs.iterdir()):
+        docs_source = host_docs
+    elif workspace_docs.is_dir() and any(workspace_docs.iterdir()):
+        docs_source = workspace_docs
+
+    if docs_source is not None:
+        import shutil
+        target_docs.mkdir(parents=True, exist_ok=True)
+        for src_file in docs_source.rglob("*"):
+            if src_file.is_file():
+                rel = src_file.relative_to(docs_source)
+                dest = target_docs / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_file, dest)
+        label = "host" if docs_source == host_docs else "workspace"
+        print(f"[post_install] Global docs installed from {label}: {docs_source}", file=sys.stderr)
+
+
 def fix_directory_ownership():
     """Fix ownership of mounted volumes that may have root ownership."""
     uid = os.getuid()
@@ -418,6 +481,7 @@ def main():
     """Run all post-install configuration."""
     print("[post_install] Starting post-install configuration...", file=sys.stderr)
 
+    setup_global_claude_md()
     setup_claude_settings()
     setup_claude_settings_from_dotfiles()
     setup_claude_statusline()
