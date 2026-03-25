@@ -237,47 +237,59 @@ node_modules/
 .env.*.local
 """
     # Preserve any patterns from .dotfiles (copied at build time)
-    existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+    try:
+        existing = gitignore.read_text(encoding="utf-8")
+    except OSError:
+        existing = ""
     if existing:
-        existing_lines = set(existing.splitlines())
-        new_lines = [ln for ln in patterns.splitlines() if ln not in existing_lines]
+        existing_patterns = {
+            ln for ln in existing.splitlines()
+            if ln and not ln.startswith("#")
+        }
+        new_lines = [
+            ln for ln in patterns.splitlines()
+            if not ln or ln.startswith("#") or ln not in existing_patterns
+        ]
         combined = existing.rstrip("\n") + "\n\n# Container defaults\n" + "\n".join(new_lines) + "\n"
     else:
         combined = patterns
     gitignore.write_text(combined, encoding="utf-8")
     print(f"[post_install] Global gitignore created: {gitignore}", file=sys.stderr)
 
-    # Create local git config that includes host config and sets excludesfile + delta
-    # Delta config is included here so it works even if host doesn't have it configured
-    local_config = f"""\
-# Container-local git config
-# Includes host config (mounted read-only) and adds container settings
+    # Build local git config by prepending host config content, then appending
+    # container-specific overrides. We avoid [include] because GIT_CONFIG_GLOBAL
+    # pointing to this file + including ~/.gitconfig creates a circular include
+    # (git recognizes ~/.gitconfig as the default global path and re-enters).
+    try:
+        host_content = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
+    except OSError:
+        host_content = ""
 
-[include]
-    path = {host_gitconfig}
-
-[core]
-    excludesfile = {gitignore}
-    pager = delta
-
-[interactive]
-    diffFilter = delta --color-only
-
-[delta]
-    navigate = true
-    light = false
-    line-numbers = true
-    side-by-side = false
-
-[merge]
-    conflictstyle = diff3
-
-[diff]
-    colorMoved = default
-
-[gpg "ssh"]
-    program = /usr/bin/ssh-keygen
-"""
+    # Build by concatenation — not f-string — because host_content may contain
+    # curly braces (shell variables in git aliases, hook commands, etc.).
+    host_section = host_content + "\n\n" if host_content else ""
+    local_config = (
+        f"# Container-local git config\n"
+        f"# Host config (from {host_gitconfig}, mounted read-only) followed by container overrides\n\n"
+        + host_section
+        + "# --- Container overrides ---\n\n"
+        + "[core]\n"
+        + f"    excludesfile = {gitignore}\n"
+        + "    pager = delta\n\n"
+        + "[interactive]\n"
+        + "    diffFilter = delta --color-only\n\n"
+        + "[delta]\n"
+        + "    navigate = true\n"
+        + "    light = false\n"
+        + "    line-numbers = true\n"
+        + "    side-by-side = false\n\n"
+        + "[merge]\n"
+        + "    conflictstyle = diff3\n\n"
+        + "[diff]\n"
+        + "    colorMoved = default\n\n"
+        + '[gpg "ssh"]\n'
+        + "    program = /usr/bin/ssh-keygen\n"
+    )
     local_gitconfig.write_text(local_config, encoding="utf-8")
     print(f"[post_install] Local git config created: {local_gitconfig}", file=sys.stderr)
 
@@ -371,8 +383,11 @@ def setup_exa_mcp():
     except FileNotFoundError:
         print("[post_install] Warning: claude CLI not found, skipping Exa MCP setup", file=sys.stderr)
     except subprocess.CalledProcessError as e:
-        error_detail = e.stderr or f"exit code {e.returncode}"
-        print(f"[post_install] Warning: Failed to register Exa MCP: {error_detail}", file=sys.stderr)
+        error_detail = e.stderr.strip() if e.stderr else f"exit code {e.returncode}"
+        if "already exists" in error_detail:
+            print("[post_install] Info: Exa MCP server already registered, skipping", file=sys.stderr)
+        else:
+            print(f"[post_install] Warning: Failed to register Exa MCP: {error_detail}", file=sys.stderr)
 
 
 def validate_git_worktree():
@@ -381,7 +396,10 @@ def validate_git_worktree():
     if not git_file.exists() or git_file.is_dir():
         return
 
-    content = git_file.read_text().strip()
+    try:
+        content = git_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        return
     if not content.startswith("gitdir:"):
         return
 
