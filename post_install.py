@@ -197,8 +197,11 @@ def setup_global_claude_md():
                     f"[post_install] Warning: failed to clean docs dir: {e}",
                     file=sys.stderr,
                 )
+                return
         target_docs.mkdir(parents=True, exist_ok=True)
         for src_file in docs_source.rglob("*"):
+            if src_file.is_symlink():
+                continue
             if src_file.is_file():
                 rel = src_file.relative_to(docs_source)
                 dest = target_docs / rel
@@ -312,9 +315,15 @@ def setup_claude_statusline():
         return
 
     target = Path.home() / ".claude" / "statusline.sh"
-    target.write_bytes(staged.read_bytes())
-    target.chmod(0o755)
-    print(f"[post_install] Claude statusline deployed: {target}", file=sys.stderr)
+    try:
+        target.write_bytes(staged.read_bytes())
+        target.chmod(0o755)
+        print(f"[post_install] Claude statusline deployed: {target}", file=sys.stderr)
+    except OSError as e:
+        print(
+            f"[post_install] Warning: failed to deploy statusline: {e}",
+            file=sys.stderr,
+        )
 
 
 def setup_global_gitignore():
@@ -429,7 +438,7 @@ node_modules/
     # include: host .gitconfig includes .gitconfig.local, which IS this file.
     # First remove just the path line, then clean up any empty [include] sections.
     host_content = re.sub(
-        r'(?m)^\s*path\s*=\s*"?(?:~/?|/.*/)?\.gitconfig\.local"?\s*$',
+        r'(?m)^\s*path\s*=\s*"?(?:~/?|(?:[./][^"]*/))?\.gitconfig\.local"?\s*$',
         "",
         host_raw,
     )
@@ -487,7 +496,11 @@ def setup_gh_credential_helper():
 
     content = local_gitconfig.read_text(encoding="utf-8")
     marker = '[credential "https://github.com"]'
-    if marker in content:
+    if any(
+        line.strip() == marker
+        for line in content.splitlines()
+        if not line.strip().startswith("#")
+    ):
         print(
             "[post_install] gh credential helper already configured, skipping",
             file=sys.stderr,
@@ -529,6 +542,13 @@ def setup_codex_config():
         )
         return
 
+    if '"' in base_url or "\n" in base_url or "\\" in base_url:
+        print(
+            "[post_install] Warning: CODEX_AZURE_BASE_URL contains invalid characters, skipping Codex config",
+            file=sys.stderr,
+        )
+        return
+
     config = f"""\
 model = "gpt-5.3-codex"
 model_provider = "azure"
@@ -562,6 +582,9 @@ def setup_exa_mcp():
         )
         return
 
+    # API key is passed as a URL query parameter — visible in /proc/<pid>/cmdline
+    # during registration and persisted in Claude's MCP config. This is inherent
+    # to the HTTP MCP transport; acceptable risk in a single-user devcontainer.
     url = f"https://mcp.exa.ai/mcp?exaApiKey={api_key}"
     try:
         subprocess.run(
