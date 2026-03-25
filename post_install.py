@@ -119,8 +119,13 @@ def setup_global_claude_md():
     except OSError:
         pass
 
-    if source is None and workspace_claude_md.exists():
-        source = workspace_claude_md
+    if source is None:
+        try:
+            content = workspace_claude_md.read_text(encoding="utf-8").strip()
+            if content:
+                source = workspace_claude_md
+        except OSError:
+            pass
 
     if source is not None:
         try:
@@ -171,7 +176,13 @@ def setup_global_claude_md():
                 rel = src_file.relative_to(docs_source)
                 dest = target_docs / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src_file, dest)
+                try:
+                    shutil.copy2(src_file, dest)
+                except OSError as e:
+                    print(
+                        f"[post_install] Warning: failed to copy doc {rel}: {e}",
+                        file=sys.stderr,
+                    )
         label = "host" if docs_source == host_docs else "workspace"
         print(
             f"[post_install] Global docs installed from {label}: {docs_source}",
