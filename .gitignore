@@ -5,6 +5,6 @@ __pycache__/
 .idea/
 /.dotfiles/nvim/lazy-lock.json
 .devc.env
-!/.claude/docs/
-!/.claude/CLAUDE.md
+
+!/.dotfiles/.claude/**/*
 

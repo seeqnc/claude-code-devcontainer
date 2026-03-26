@@ -45,7 +45,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
 COPY --from=uv /uv /usr/local/bin/uv
 
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
-ARG FZF_VERSION=0.67.0
+ARG FZF_VERSION=0.70.0
 RUN ARCH=$(dpkg --print-architecture) && \
   case "${ARCH}" in \
     amd64) FZF_ARCH="linux_amd64" ;; \
@@ -154,15 +154,13 @@ RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/downloa
   -x
 
 # Copy dotfiles into staging dir, then move into place (no-op when .dotfiles/ is empty)
-COPY --chown=vscode:vscode .dotfiles/ /tmp/dotfiles/
+COPY --chown=vscode:vscode .dotfiles/* /tmp/dotfiles
 RUN for f in .aliases .exports .functions .vimrc; do \
       if [ -f "/tmp/dotfiles/$f" ]; then cp "/tmp/dotfiles/$f" "$HOME/$f"; fi; \
     done && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -d /tmp/dotfiles/nvim ]; then cp -r /tmp/dotfiles/nvim "$HOME/.config/nvim"; fi && \
-    if [ -f /tmp/dotfiles/.claude/settings.json ]; then cp /tmp/dotfiles/.claude/settings.json /opt/dotfiles-claude-settings.json; fi && \
-    if [ -f /tmp/dotfiles/.claude/statusline.sh ]; then cp /tmp/dotfiles/.claude/statusline.sh /opt/dotfiles-claude-statusline.sh && chmod +x /opt/dotfiles-claude-statusline.sh; fi && \
-    rm -rf /tmp/dotfiles
+    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi
 
 # Pre-install vim-plug and plugins so vim starts clean without network calls
 ARG VIM_PLUG_VERSION=0.14.0

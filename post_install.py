@@ -2,7 +2,7 @@
 """Post-install configuration for Claude Code devcontainer.
 
 Runs on container creation to set up:
-- Global CLAUDE.md and docs (from host ~/.claude or workspace fallback)
+- Global CLAUDE.md and docs (from host ~/.claude)
 - Claude settings (bypassPermissions mode)
 - Git config (inlined host config, global gitignore, delta, credential helper)
 - Tmux configuration (200k history, mouse support)
@@ -16,6 +16,50 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+GITIGNORE_PATTERNS = """\
+# Claude Code
+.claude/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Python
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.npm/
+
+# Editors
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# Devcontainer
+.devcontainer
+.devc.env
+
+# Misc
+*.log
+.env.local
+.env.*.local
+"""
 
 
 def setup_claude_settings():
@@ -95,129 +139,57 @@ set -g status-right '%Y-%m-%d %H:%M'
 
 
 def setup_global_claude_md():
-    """Populate ~/.claude/CLAUDE.md and ~/.claude/docs from host or workspace fallback.
+    """Copy host ~/.claude/CLAUDE.md and ~/.claude/docs into the container volume.
 
     The host's ~/.claude/CLAUDE.md and ~/.claude/docs are bind-mounted read-only
-    to /opt/host-claude/ (staging). If the host file has content, it is copied to
-    ~/.claude/CLAUDE.md (on the writable volume). If empty or missing, the
-    workspace's .claude/CLAUDE.md is used as fallback — providing global development
-    standards even when the host has no CLAUDE.md.
-
-    Same logic applies to docs/: host docs win, workspace docs are the fallback.
+    to /opt/host-claude/. If present and non-empty, they are copied to ~/.claude/
+    on the writable volume. If missing, nothing happens — users are expected to
+    populate ~/.claude on the host.
     """
     claude_dir = Path.home() / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
 
     host_claude_md = Path("/opt/host-claude/CLAUDE.md")
-    workspace_claude_md = Path("/workspace/.claude/CLAUDE.md")
+    default_claude_md = Path("/opt/dotfiles/.claude/CLAUDE.md")
     target_claude_md = claude_dir / "CLAUDE.md"
 
-    # CLAUDE.md: prefer host, fall back to workspace
-    source = None
+    if not host_claude_md.is_file() or not default_claude_md.is_file():
+        print(f"[post_install] Warning: No host or default CLAUDE.md not found: {host_claude_md}, {default_claude_md}")
+        return
+
+    source_claude_md = host_claude_md if host_claude_md.exists() else default_claude_md
+    print(f"[post_install] **** Using {source_claude_md}")
+
     try:
-        content = host_claude_md.read_text(encoding="utf-8").strip()
+        content = source_claude_md.read_text(encoding="utf-8").strip()
         if content:
-            source = host_claude_md
+            shutil.copy2(source_claude_md, target_claude_md)
+            print(f"[post_install] Global CLAUDE.md installed from {source_claude_md}", file=sys.stderr)
+        else:
+            print(f"[post_install] Warning: CLAUDE.md from {source_claude_md} is empty, skipping", file=sys.stderr)
     except FileNotFoundError:
-        pass
+        print("[post_install] No host CLAUDE.md found, skipping", file=sys.stderr)
     except OSError as e:
-        print(
-            f"[post_install] Warning: could not read {host_claude_md}: {e}",
-            file=sys.stderr,
-        )
+        print(f"[post_install] Warning: could not read host CLAUDE.md: {e}", file=sys.stderr)
 
-    if source is None:
-        try:
-            content = workspace_claude_md.read_text(encoding="utf-8").strip()
-            if content:
-                source = workspace_claude_md
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            print(
-                f"[post_install] Warning: could not read {workspace_claude_md}: {e}",
-                file=sys.stderr,
-            )
-
-    if source is not None:
-        try:
-            shutil.copy2(source, target_claude_md)
-            label = "host" if source == host_claude_md else "workspace"
-            print(
-                f"[post_install] Global CLAUDE.md installed from {label}: {source}",
-                file=sys.stderr,
-            )
-        except OSError as e:
-            print(
-                f"[post_install] Warning: failed to copy CLAUDE.md: {e}",
-                file=sys.stderr,
-            )
-    else:
-        print(
-            "[post_install] No CLAUDE.md found (checked host and workspace), skipping",
-            file=sys.stderr,
-        )
-
-    # docs/: prefer host, fall back to workspace
     host_docs = Path("/opt/host-claude/docs")
-    workspace_docs = Path("/workspace/.claude/docs")
     target_docs = claude_dir / "docs"
 
-    docs_source = None
-    try:
-        if host_docs.is_dir() and any(host_docs.iterdir()):
-            docs_source = host_docs
-    except FileNotFoundError:
-        pass
-    except OSError as e:
-        print(
-            f"[post_install] Warning: could not read {host_docs}: {e}", file=sys.stderr
-        )
-    try:
-        if (
-            docs_source is None
-            and workspace_docs.is_dir()
-            and any(workspace_docs.iterdir())
-        ):
-            docs_source = workspace_docs
-    except FileNotFoundError:
-        pass
-    except OSError as e:
-        print(
-            f"[post_install] Warning: could not read {workspace_docs}: {e}",
-            file=sys.stderr,
-        )
+    if not host_docs.is_dir() or not any(host_docs.iterdir()):
+        return
 
-    if docs_source is not None:
-        if target_docs.exists():
-            try:
-                shutil.rmtree(target_docs)
-            except OSError as e:
-                print(
-                    f"[post_install] Warning: failed to clean docs dir: {e}",
-                    file=sys.stderr,
-                )
-                return
-        target_docs.mkdir(parents=True, exist_ok=True)
-        for src_file in docs_source.rglob("*"):
-            if src_file.is_symlink():
-                continue
-            if src_file.is_file():
-                rel = src_file.relative_to(docs_source)
-                dest = target_docs / rel
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    shutil.copy2(src_file, dest)
-                except OSError as e:
-                    print(
-                        f"[post_install] Warning: failed to copy doc {rel}: {e}",
-                        file=sys.stderr,
-                    )
-        label = "host" if docs_source == host_docs else "workspace"
-        print(
-            f"[post_install] Global docs installed from {label}: {docs_source}",
-            file=sys.stderr,
-        )
+    target_docs.mkdir(parents=True, exist_ok=True)
+    for src_file in host_docs.rglob("*"):
+        if src_file.is_symlink() or not src_file.is_file():
+            continue
+        rel = src_file.relative_to(host_docs)
+        dest = target_docs / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(src_file, dest)
+        except OSError as e:
+            print(f"[post_install] Warning: failed to copy doc {rel}: {e}", file=sys.stderr)
+    print("[post_install] Global docs installed from host", file=sys.stderr)
 
 
 def fix_directory_ownership():
@@ -276,7 +248,7 @@ def setup_claude_settings_from_dotfiles():
     Docker volume — files baked into the image layer are hidden by the volume mount.
     This function reads the staged copy and deep-merges it at runtime.
     """
-    staged = Path("/opt/dotfiles-claude-settings.json")
+    staged = Path("/opt/dotfiles/.claude/settings.json")
     if not staged.exists():
         return
 
@@ -310,7 +282,7 @@ def setup_claude_settings_from_dotfiles():
 
 def setup_claude_statusline():
     """Deploy statusline script from dotfiles into the volume-mounted Claude config."""
-    staged = Path("/opt/dotfiles-claude-statusline.sh")
+    staged = Path("/opt/dotfiles/.claude/statusline.sh")
     if not staged.exists():
         return
 
@@ -329,131 +301,35 @@ def setup_claude_statusline():
 def setup_global_gitignore():
     """Set up global gitignore and local git config.
 
-    Since ~/.gitconfig is mounted read-only from host, we create a local
-    config file that includes the host config and adds container-specific
-    settings like core.excludesfile and delta configuration.
-
-    GIT_CONFIG_GLOBAL env var (set in devcontainer.json) points git to this
-    local config as the "global" config.
+    ~/.gitconfig is mounted read-only from host. GIT_CONFIG_GLOBAL (set in
+    devcontainer.json) points git to ~/.gitconfig.local as the "global" config.
+    We inline the host config into that file and append container overrides.
     """
     home = Path.home()
     gitignore = home / ".gitignore_global"
     local_gitconfig = home / ".gitconfig.local"
     host_gitconfig = home / ".gitconfig"
 
-    # Create global gitignore with common patterns
-    patterns = """\
-# Claude Code
-.claude/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Python
-*.pyc
-*.pyo
-__pycache__/
-*.egg-info/
-.eggs/
-*.egg
-.venv/
-venv/
-.mypy_cache/
-.ruff_cache/
-
-# Node
-node_modules/
-.npm/
-
-# Editors
-*.swp
-*.swo
-*~
-.idea/
-.vscode/
-*.sublime-*
-
-# Devcontainer
-.devcontainer
-.devc.env
-
-# Misc
-*.log
-.env.local
-.env.*.local
-"""
-    # Preserve any patterns from .dotfiles (copied at build time)
-    try:
-        existing = gitignore.read_text(encoding="utf-8")
-    except OSError:
-        existing = ""
-    if existing and "# Container defaults" not in existing:
-        existing_patterns = {
-            ln.strip()
-            for ln in existing.splitlines()
-            if ln.strip() and not ln.startswith("#")
-        }
-        new_patterns = [
-            ln
-            for ln in patterns.splitlines()
-            if ln.strip()
-            and not ln.startswith("#")
-            and ln.strip() not in existing_patterns
-        ]
-        if new_patterns:
-            combined = (
-                existing.rstrip("\n")
-                + "\n\n# Container defaults\n"
-                + "\n".join(new_patterns)
-                + "\n"
-            )
-        else:
-            combined = existing
-    elif not existing:
-        combined = patterns
-    else:
-        combined = existing
-    gitignore.write_text(combined, encoding="utf-8")
+    gitignore.write_text(GITIGNORE_PATTERNS, encoding="utf-8")
     print(f"[post_install] Global gitignore created: {gitignore}", file=sys.stderr)
 
-    # Build local git config by prepending host config content, then appending
-    # container-specific overrides. We avoid [include] because GIT_CONFIG_GLOBAL
-    # pointing to this file + including ~/.gitconfig creates a circular include
-    # (git recognizes ~/.gitconfig as the default global path and re-enters).
     try:
         host_raw = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
     except FileNotFoundError:
         host_raw = ""
     except OSError as e:
-        print(
-            f"[post_install] Warning: could not read host gitconfig {host_gitconfig}: {e}",
-            file=sys.stderr,
-        )
+        print(f"[post_install] Warning: could not read {host_gitconfig}: {e}", file=sys.stderr)
         host_raw = ""
 
-    # Strip the self-referencing include of .gitconfig.local to prevent circular
-    # include: host .gitconfig includes .gitconfig.local, which IS this file.
-    # First remove just the path line, then clean up any empty [include] sections.
-    host_content = re.sub(
-        r'(?m)^\s*path\s*=\s*"?(?:~/?|(?:[./][^"]*/))?\.gitconfig\.local"?\s*$',
-        "",
-        host_raw,
-    )
-    host_content = re.sub(
-        r"(?m)^\[include\]\s*\n(?=\[|\Z)",
-        "",
-        host_content,
-    ).strip()
+    # Strip any include of .gitconfig.local — that file IS this file, so
+    # including it would create a circular reference. Then remove empty [include] sections.
+    host_content = re.sub(r"(?m)^\s*path\s*=\s*.*\.gitconfig\.local\s*$", "", host_raw)
+    host_content = re.sub(r"(?m)^\[include\]\s*\n(?=\[|\Z)", "", host_content).strip()
 
-    # Build by concatenation — not f-string — because host_content may contain
-    # curly braces (shell variables in git aliases, hook commands, etc.).
     host_section = host_content + "\n\n" if host_content else ""
+    # Concatenation (not f-string) because host_content may contain curly braces.
     local_config = (
-        f"# Container-local git config\n"
-        f"# Host config (from {host_gitconfig}, mounted read-only) followed by container overrides\n\n"
+        "# Container-local git config (host config + container overrides)\n\n"
         + host_section
         + "# --- Container overrides ---\n\n"
         + "[core]\n"
