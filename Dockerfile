@@ -154,7 +154,7 @@ RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/downloa
   -x
 
 # Copy dotfiles into staging dir, then move into place (no-op when .dotfiles/ is empty)
-COPY --chown=vscode:vscode .dotfiles/* /tmp/dotfiles
+COPY --chown=vscode:vscode .dotfiles/* /tmp/dotfiles/
 RUN for f in .aliases .exports .functions .vimrc; do \
       if [ -f "/tmp/dotfiles/$f" ]; then cp "/tmp/dotfiles/$f" "$HOME/$f"; fi; \
     done && \
