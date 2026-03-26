@@ -158,7 +158,6 @@ def setup_global_claude_md():
         return
 
     source_claude_md = host_claude_md if host_claude_md.exists() else default_claude_md
-    print(f"[post_install] **** Using {source_claude_md}")
 
     try:
         content = source_claude_md.read_text(encoding="utf-8").strip()
@@ -166,7 +165,11 @@ def setup_global_claude_md():
             shutil.copy2(source_claude_md, target_claude_md)
             print(f"[post_install] Global CLAUDE.md installed from {source_claude_md}", file=sys.stderr)
         else:
-            print(f"[post_install] Warning: CLAUDE.md from {source_claude_md} is empty, skipping", file=sys.stderr)
+            print(f"[post_install] CLAUDE.md from {source_claude_md} is empty, using default from {default_claude_md}", file=sys.stderr)
+            if default_claude_md.exists():
+                shutil.copy2(default_claude_md, target_claude_md)
+            else:
+                print(f"[post_install] Warning: Default CLAUDE.md not found at {default_claude_md}", file=sys.stderr)
     except FileNotFoundError:
         print("[post_install] No host CLAUDE.md found, skipping", file=sys.stderr)
     except OSError as e:
