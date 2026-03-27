@@ -136,7 +136,7 @@ get_workspace_folder() {
 # Accepts: "all" or a positive integer (number of GPUs to expose).
 # When unset, removes any --gpus entries from runArgs.
 setup_gpu_passthrough() {
-	local devcontainer_json="$1"
+	local devcontainer_json="$1/.devcontainer/devcontainer.json"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
@@ -179,7 +179,7 @@ setup_gpu_passthrough() {
 # When set, publishes the port on localhost. When unset, removes any --publish
 # entries so containers don't clash (especially across worktrees).
 setup_port_publishing() {
-	local devcontainer_json="$1"
+	local devcontainer_json="$1/.devcontainer/devcontainer.json"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
@@ -254,6 +254,42 @@ setup_extra_packages() {
 		return 1
 	}
 	echo "$updated" >"$devcontainer_json"
+}
+
+# Inject or remove a signing-key bind mount based on GIT_SIGNING_KEY env var.
+# When set, validates the host path and mounts it read-only into the container.
+# When unset, removes any stale signing-key mount.
+setup_signing_key() {
+	local workspace="$1"
+	local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+
+	local container_target="/home/vscode/.ssh/signing_key"
+
+	if [[ -n "${GIT_SIGNING_KEY:-}" ]]; then
+		# Expand ~ to $HOME
+		local key_path="${GIT_SIGNING_KEY/#\~/$HOME}"
+
+		if [[ ! -f "$key_path" ]]; then
+			log_error "GIT_SIGNING_KEY file not found: $key_path"
+			exit 1
+		fi
+
+		# Canonicalize to absolute path
+		key_path="$(cd "$(dirname "$key_path")" && pwd)/$(basename "$key_path")"
+
+		log_info "Signing key: $key_path → $container_target (read-only)"
+		update_devcontainer_mounts "$devcontainer_json" \
+			"$key_path" "$container_target" "true"
+	else
+		# Remove stale signing key mount
+		local updated
+		updated=$(jq --arg target "$container_target" '
+      .mounts = ((.mounts // []) | map(select(contains("target=" + $target + ",") or endswith("target=" + $target) | not)))
+    ' "$devcontainer_json") || return 0
+		echo "$updated" >"$devcontainer_json"
+	fi
 }
 
 # Detect if a workspace is a git worktree and resolve the main .git directory.
@@ -333,7 +369,8 @@ extract_mounts_to_file() {
         (contains("target=/home/vscode/.claude/commands,") | not) and
         (contains("target=/home/vscode/.claude/skills,") | not) and
         (contains("target=/home/vscode/.claude/rules,") | not) and
-        (contains("target=/home/vscode/.claude/docs,") | not)
+        (contains("target=/home/vscode/.claude/docs,") | not) and
+        (contains("target=/home/vscode/.ssh/signing_key,") | not)
       )
     ) | if length > 0 then . else empty end
   ' "$devcontainer_json" 2>/dev/null) || true
@@ -419,23 +456,17 @@ cmd_template() {
 	cp "$SCRIPT_DIR/Dockerfile" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
-	cp "$SCRIPT_DIR/.zshrc" "$devcontainer_dir/"
-	cp "$SCRIPT_DIR/.bashrc" "$devcontainer_dir/"
-	cp "$SCRIPT_DIR/.bash_profile" "$devcontainer_dir/"
 
 	# Copy .devc.env.example so users know which env vars to set
 	if [[ -f "$SCRIPT_DIR/.devc.env.example" ]]; then
 		cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
 	fi
 
-	# Always create .dotfiles/ (Dockerfile COPY requires it to exist)
+	# Copy dotfiles (shell configs, aliases, editor configs, etc.)
+	# Uses /. suffix to copy directory contents, not the directory itself
 	mkdir -p "$devcontainer_dir/.dotfiles/.claude"
-
-	# Copy dotfiles if present (optional — only in forks with .dotfiles/)
-	if [[ -d "$SCRIPT_DIR/.dotfiles" ]]; then
-		cp -r "$SCRIPT_DIR/.dotfiles" "$devcontainer_dir/.dotfiles"
-		log_info "Dotfiles copied"
-	fi
+	cp -r "$SCRIPT_DIR/.dotfiles/." "$devcontainer_dir/.dotfiles/"
+	log_info "Dotfiles copied"
 
 	# Restore preserved mounts
 	if [[ -n "$preserved_mounts" ]]; then
@@ -455,9 +486,10 @@ cmd_up() {
 	load_env_file "$workspace_folder"
 	check_no_sys_admin "$workspace_folder"
 	setup_worktree_mount "$workspace_folder"
-	setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
-	setup_gpu_passthrough "$workspace_folder/.devcontainer/devcontainer.json"
+	setup_port_publishing "$workspace_folder"
+	setup_gpu_passthrough "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_signing_key "$workspace_folder"
 	log_info "Starting devcontainer in $workspace_folder..."
 
 	devcontainer up --workspace-folder "$workspace_folder"
@@ -472,9 +504,10 @@ cmd_rebuild() {
 	load_env_file "$workspace_folder"
 	check_no_sys_admin "$workspace_folder"
 	setup_worktree_mount "$workspace_folder"
-	setup_port_publishing "$workspace_folder/.devcontainer/devcontainer.json"
-	setup_gpu_passthrough "$workspace_folder/.devcontainer/devcontainer.json"
+	setup_port_publishing "$workspace_folder"
+	setup_gpu_passthrough "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_signing_key "$workspace_folder"
 	log_info "Rebuilding devcontainer in $workspace_folder..."
 
 	devcontainer up --workspace-folder "$workspace_folder" --remove-existing-container
@@ -582,6 +615,9 @@ HEADER
 	echo "# Optional — GPU passthrough: \"all\" or number of GPUs (requires NVIDIA Container Toolkit)"
 	echo "# DEVC_GPU=all"
 	echo ""
+	echo "# Optional — SSH key for signed git commits (absolute path on host)"
+	echo "# GIT_SIGNING_KEY=~/.ssh/id_ed25519"
+	echo ""
 }
 
 cmd_mount() {
@@ -614,8 +650,8 @@ cmd_mount() {
 	check_devcontainer_cli
 
 	load_env_file "$workspace_folder"
-	setup_port_publishing "$devcontainer_json"
-	setup_gpu_passthrough "$devcontainer_json"
+	setup_port_publishing "$workspace_folder"
+	setup_gpu_passthrough "$workspace_folder"
 
 	log_info "Adding mount: $host_path → $container_path"
 	update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "$readonly"

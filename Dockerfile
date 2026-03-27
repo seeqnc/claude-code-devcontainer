@@ -153,11 +153,12 @@ RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/downloa
   -p git \
   -x
 
-# Copy dotfiles into staging dir, then move into place (no-op when .dotfiles/ is empty)
-COPY --chown=vscode:vscode .dotfiles/* /tmp/dotfiles/
-RUN for f in .aliases .exports .functions .vimrc; do \
+# Copy dotfiles into staging dir, then move into place
+COPY --chown=vscode:vscode .dotfiles/ /tmp/dotfiles/
+RUN for f in .aliases .bash_profile .bashrc .exports .functions .vimrc; do \
       if [ -f "/tmp/dotfiles/$f" ]; then cp "/tmp/dotfiles/$f" "$HOME/$f"; fi; \
     done && \
+    if [ -f /tmp/dotfiles/.zshrc ]; then cp /tmp/dotfiles/.zshrc "$HOME/.zshrc.custom"; fi && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -d /tmp/dotfiles/nvim ]; then cp -r /tmp/dotfiles/nvim "$HOME/.config/nvim"; fi && \
     if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi
@@ -171,11 +172,6 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 # Pre-install lazy.nvim plugins and treesitter parsers so nvim starts clean
 RUN nvim --headless "+Lazy! restore" +qa 2>&1 || true
 RUN nvim --headless "+TSInstallSync bash go json lua markdown python toml typescript yaml" +qa 2>&1 || true
-
-# Copy shell configurations
-COPY --chown=vscode:vscode .bashrc /home/vscode/.bashrc
-COPY --chown=vscode:vscode .bash_profile /home/vscode/.bash_profile
-COPY --chown=vscode:vscode .zshrc /home/vscode/.zshrc.custom
 
 # Container-specific overrides (appended after dotfiles sourcing in .bashrc)
 RUN cat >> /home/vscode/.bashrc <<'CONTAINER'

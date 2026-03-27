@@ -17,6 +17,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+LOG_PREFIX = "[post_install]"
+
+
+def log(msg: str) -> None:
+    print(f"{LOG_PREFIX} {msg}", file=sys.stderr)
+
+
+def log_warn(msg: str) -> None:
+    print(f"{LOG_PREFIX} Warning: {msg}", file=sys.stderr)
+
+
+def log_error(msg: str) -> None:
+    print(f"{LOG_PREFIX} ERROR: {msg}", file=sys.stderr)
+
 GITIGNORE_PATTERNS = """\
 # Claude Code
 .claude/
@@ -75,10 +89,7 @@ def setup_claude_settings():
         try:
             settings = json.loads(settings_file.read_text())
         except json.JSONDecodeError as e:
-            print(
-                f"[post_install] Warning: corrupt {settings_file}, resetting: {e}",
-                file=sys.stderr,
-            )
+            log_warn(f"corrupt {settings_file}, resetting: {e}")
 
     # Set bypassPermissions mode
     if "permissions" not in settings:
@@ -86,9 +97,7 @@ def setup_claude_settings():
     settings["permissions"]["defaultMode"] = "bypassPermissions"
 
     settings_file.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    print(
-        f"[post_install] Claude settings configured: {settings_file}", file=sys.stderr
-    )
+    log(f"Claude settings configured: {settings_file}")
 
 
 def setup_tmux_config():
@@ -96,7 +105,7 @@ def setup_tmux_config():
     tmux_conf = Path.home() / ".tmux.conf"
 
     if tmux_conf.exists():
-        print("[post_install] Tmux config exists, skipping", file=sys.stderr)
+        log("Tmux config exists, skipping")
         return
 
     config = """\
@@ -135,7 +144,7 @@ set -g status-left '[#S] '
 set -g status-right '%Y-%m-%d %H:%M'
 """
     tmux_conf.write_text(config, encoding="utf-8")
-    print(f"[post_install] Tmux configured: {tmux_conf}", file=sys.stderr)
+    log(f"Tmux configured: {tmux_conf}")
 
 
 def setup_global_claude_md():
@@ -154,7 +163,7 @@ def setup_global_claude_md():
     target_claude_md = claude_dir / "CLAUDE.md"
 
     if not host_claude_md.is_file() or not default_claude_md.is_file():
-        print(f"[post_install] Warning: No host or default CLAUDE.md not found: {host_claude_md}, {default_claude_md}")
+        log_warn(f"No host or default CLAUDE.md found: {host_claude_md}, {default_claude_md}")
         return
 
     source_claude_md = host_claude_md if host_claude_md.exists() else default_claude_md
@@ -163,17 +172,17 @@ def setup_global_claude_md():
         content = source_claude_md.read_text(encoding="utf-8").strip()
         if content:
             shutil.copy2(source_claude_md, target_claude_md)
-            print(f"[post_install] Global CLAUDE.md installed from {source_claude_md}", file=sys.stderr)
+            log(f"Global CLAUDE.md installed from {source_claude_md}")
         else:
-            print(f"[post_install] CLAUDE.md from {source_claude_md} is empty, using default from {default_claude_md}", file=sys.stderr)
+            log(f"CLAUDE.md from {source_claude_md} is empty, using default from {default_claude_md}")
             if default_claude_md.exists():
                 shutil.copy2(default_claude_md, target_claude_md)
             else:
-                print(f"[post_install] Warning: Default CLAUDE.md not found at {default_claude_md}", file=sys.stderr)
+                log_warn(f"Default CLAUDE.md not found at {default_claude_md}")
     except FileNotFoundError:
-        print("[post_install] No host CLAUDE.md found, skipping", file=sys.stderr)
+        log("No host CLAUDE.md found, skipping")
     except OSError as e:
-        print(f"[post_install] Warning: could not read host CLAUDE.md: {e}", file=sys.stderr)
+        log_warn(f"could not read host CLAUDE.md: {e}")
 
     host_docs = Path("/opt/host-claude/docs")
     target_docs = claude_dir / "docs"
@@ -191,8 +200,8 @@ def setup_global_claude_md():
         try:
             shutil.copy2(src_file, dest)
         except OSError as e:
-            print(f"[post_install] Warning: failed to copy doc {rel}: {e}", file=sys.stderr)
-    print("[post_install] Global docs installed from host", file=sys.stderr)
+            log_warn(f"failed to copy doc {rel}: {e}")
+    log("Global docs installed from host")
 
 
 def fix_directory_ownership():
@@ -217,14 +226,9 @@ def fix_directory_ownership():
                         check=True,
                         capture_output=True,
                     )
-                    print(
-                        f"[post_install] Fixed ownership: {dir_path}", file=sys.stderr
-                    )
+                    log(f"Fixed ownership: {dir_path}")
             except (PermissionError, subprocess.CalledProcessError) as e:
-                print(
-                    f"[post_install] Warning: Could not fix ownership of {dir_path}: {e}",
-                    file=sys.stderr,
-                )
+                log_warn(f"Could not fix ownership of {dir_path}: {e}")
 
 
 def deep_merge(base: dict, override: dict) -> dict:
@@ -259,10 +263,7 @@ def setup_claude_settings_from_dotfiles():
     try:
         override = json.loads(staged.read_text())
     except json.JSONDecodeError as e:
-        print(
-            f"[post_install] Warning: corrupt {staged}, skipping merge: {e}",
-            file=sys.stderr,
-        )
+        log_warn(f"corrupt {staged}, skipping merge: {e}")
 
     if not override:
         return
@@ -273,14 +274,11 @@ def setup_claude_settings_from_dotfiles():
         try:
             existing = json.loads(settings_file.read_text())
         except json.JSONDecodeError as e:
-            print(
-                f"[post_install] Warning: corrupt {settings_file}, starting fresh: {e}",
-                file=sys.stderr,
-            )
+            log_warn(f"corrupt {settings_file}, starting fresh: {e}")
 
     merged = deep_merge(existing, override)
     settings_file.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
-    print("[post_install] Claude settings merged from dotfiles", file=sys.stderr)
+    log("Claude settings merged from dotfiles")
 
 
 def setup_claude_statusline():
@@ -293,12 +291,9 @@ def setup_claude_statusline():
     try:
         target.write_bytes(staged.read_bytes())
         target.chmod(0o755)
-        print(f"[post_install] Claude statusline deployed: {target}", file=sys.stderr)
+        log(f"Claude statusline deployed: {target}")
     except OSError as e:
-        print(
-            f"[post_install] Warning: failed to deploy statusline: {e}",
-            file=sys.stderr,
-        )
+        log_warn(f"failed to deploy statusline: {e}")
 
 
 def setup_global_gitignore():
@@ -314,14 +309,14 @@ def setup_global_gitignore():
     host_gitconfig = home / ".gitconfig"
 
     gitignore.write_text(GITIGNORE_PATTERNS, encoding="utf-8")
-    print(f"[post_install] Global gitignore created: {gitignore}", file=sys.stderr)
+    log(f"Global gitignore created: {gitignore}")
 
     try:
         host_raw = host_gitconfig.read_text(encoding="utf-8").rstrip("\n")
     except FileNotFoundError:
         host_raw = ""
     except OSError as e:
-        print(f"[post_install] Warning: could not read {host_gitconfig}: {e}", file=sys.stderr)
+        log_warn(f"could not read {host_gitconfig}: {e}")
         host_raw = ""
 
     # Strip any include of .gitconfig.local — that file IS this file, so
@@ -353,9 +348,7 @@ def setup_global_gitignore():
         + "    program = /usr/bin/ssh-keygen\n"
     )
     local_gitconfig.write_text(local_config, encoding="utf-8")
-    print(
-        f"[post_install] Local git config created: {local_gitconfig}", file=sys.stderr
-    )
+    log(f"Local git config created: {local_gitconfig}")
 
 
 def setup_gh_credential_helper():
@@ -367,10 +360,7 @@ def setup_gh_credential_helper():
     """
     local_gitconfig = Path.home() / ".gitconfig.local"
     if not local_gitconfig.exists():
-        print(
-            "[post_install] No .gitconfig.local found, skipping gh credential helper",
-            file=sys.stderr,
-        )
+        log("No .gitconfig.local found, skipping gh credential helper")
         return
 
     content = local_gitconfig.read_text(encoding="utf-8")
@@ -380,10 +370,7 @@ def setup_gh_credential_helper():
         for line in content.splitlines()
         if not line.strip().startswith("#")
     ):
-        print(
-            "[post_install] gh credential helper already configured, skipping",
-            file=sys.stderr,
-        )
+        log("gh credential helper already configured, skipping")
         return
 
     block = f"""
@@ -392,10 +379,43 @@ def setup_gh_credential_helper():
     helper = !/usr/bin/gh auth git-credential
 """
     local_gitconfig.write_text(content + block, encoding="utf-8")
-    print(
-        f"[post_install] gh credential helper configured: {local_gitconfig}",
-        file=sys.stderr,
-    )
+    log(f"gh credential helper configured: {local_gitconfig}")
+
+
+SIGNING_KEY_PATH = Path("/home/vscode/.ssh/signing_key")
+
+
+def setup_git_signing():
+    """Configure git commit and tag signing if a signing key is mounted."""
+    if not SIGNING_KEY_PATH.is_file():
+        log("No signing key mounted, skipping git signing setup")
+        return
+
+    local_gitconfig = Path.home() / ".gitconfig.local"
+    if not local_gitconfig.exists():
+        log("No .gitconfig.local found, skipping signing setup")
+        return
+
+    content = local_gitconfig.read_text(encoding="utf-8")
+    if "gpg.format" in content:
+        log("Git signing already configured, skipping")
+        return
+
+    block = f"""
+[gpg]
+    format = ssh
+
+[user]
+    signingkey = {SIGNING_KEY_PATH}
+
+[commit]
+    gpgsign = true
+
+[tag]
+    gpgsign = true
+"""
+    local_gitconfig.write_text(content + block, encoding="utf-8")
+    log(f"Git signing configured with {SIGNING_KEY_PATH}")
 
 
 def setup_codex_config():
@@ -410,22 +430,16 @@ def setup_codex_config():
 
     config_file = codex_dir / "config.toml"
     if config_file.exists():
-        print("[post_install] Codex config exists, skipping", file=sys.stderr)
+        log("Codex config exists, skipping")
         return
 
     base_url = os.environ.get("CODEX_AZURE_BASE_URL")
     if not base_url:
-        print(
-            "[post_install] CODEX_AZURE_BASE_URL not set, skipping Codex config",
-            file=sys.stderr,
-        )
+        log("CODEX_AZURE_BASE_URL not set, skipping Codex config")
         return
 
     if '"' in base_url or "\n" in base_url or "\\" in base_url:
-        print(
-            "[post_install] Warning: CODEX_AZURE_BASE_URL contains invalid characters, skipping Codex config",
-            file=sys.stderr,
-        )
+        log_warn("CODEX_AZURE_BASE_URL contains invalid characters, skipping Codex config")
         return
 
     config = f"""\
@@ -445,7 +459,7 @@ trust_level = "trusted"
 "gpt-5.3-codex" = "gpt-5.4"
 """
     config_file.write_text(config, encoding="utf-8")
-    print(f"[post_install] Codex config created: {config_file}", file=sys.stderr)
+    log(f"Codex config created: {config_file}")
 
 
 def setup_exa_mcp():
@@ -455,10 +469,7 @@ def setup_exa_mcp():
     """
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
-        print(
-            "[post_install] EXA_API_KEY not set, skipping Exa MCP setup",
-            file=sys.stderr,
-        )
+        log("EXA_API_KEY not set, skipping Exa MCP setup")
         return
 
     # API key is passed as a URL query parameter — visible in /proc/<pid>/cmdline
@@ -472,24 +483,15 @@ def setup_exa_mcp():
             capture_output=True,
             text=True,
         )
-        print("[post_install] Exa MCP server registered", file=sys.stderr)
+        log("Exa MCP server registered")
     except FileNotFoundError:
-        print(
-            "[post_install] Warning: claude CLI not found, skipping Exa MCP setup",
-            file=sys.stderr,
-        )
+        log_warn("claude CLI not found, skipping Exa MCP setup")
     except subprocess.CalledProcessError as e:
         error_detail = e.stderr.strip() if e.stderr else f"exit code {e.returncode}"
         if "already exists" in error_detail:
-            print(
-                "[post_install] Info: Exa MCP server already registered, skipping",
-                file=sys.stderr,
-            )
+            log("Exa MCP server already registered, skipping")
         else:
-            print(
-                f"[post_install] Warning: Failed to register Exa MCP: {error_detail}",
-                file=sys.stderr,
-            )
+            log_warn(f"Failed to register Exa MCP: {error_detail}")
 
 
 def validate_git_worktree():
@@ -507,18 +509,15 @@ def validate_git_worktree():
 
     gitdir_path = Path(content.split(":", 1)[1].strip())
     if gitdir_path.exists():
-        print(f"[post_install] Git worktree OK: {gitdir_path}", file=sys.stderr)
+        log(f"Git worktree OK: {gitdir_path}")
     else:
-        print(
-            f"[post_install] WARNING: Git worktree target not found: {gitdir_path}\n"
-            f"[post_install] Git operations will fail. Run 'devc rebuild' to fix.",
-            file=sys.stderr,
-        )
+        log_error(f"Git worktree target not found: {gitdir_path}")
+        log_error("Git operations will fail. Run 'devc rebuild' to fix.")
 
 
 def main():
     """Run all post-install configuration."""
-    print("[post_install] Starting post-install configuration...", file=sys.stderr)
+    log("Starting post-install configuration...")
 
     setup_global_claude_md()
     setup_claude_settings()
@@ -528,11 +527,12 @@ def main():
     fix_directory_ownership()
     setup_global_gitignore()
     setup_gh_credential_helper()
+    setup_git_signing()
     setup_codex_config()
     setup_exa_mcp()
     validate_git_worktree()
 
-    print("[post_install] Configuration complete!", file=sys.stderr)
+    log("Configuration complete!")
 
 
 if __name__ == "__main__":
