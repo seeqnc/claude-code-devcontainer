@@ -170,7 +170,9 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     (vim -es -u "$HOME/.vimrc" +PlugInstall +qall || true)
 
 # Pre-install lazy.nvim plugins and treesitter parsers so nvim starts clean
-RUN nvim --headless "+Lazy! restore" +qa 2>&1 || true
+# Lazy! sync is blocking (bang = wait), then TSInstallSync compiles parsers.
+# Split into two invocations so lazy plugins are fully on disk before TSInstallSync runs.
+RUN nvim --headless "+Lazy! sync" +qa 2>&1 || true
 RUN nvim --headless "+TSInstallSync bash go json lua markdown python toml typescript yaml" +qa 2>&1 || true
 
 # Container-specific overrides (appended after dotfiles sourcing in .bashrc)
