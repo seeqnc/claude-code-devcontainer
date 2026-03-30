@@ -175,22 +175,30 @@ setup_gpu_passthrough() {
 	echo "$updated" >"$tmp" && mv "$tmp" "$devcontainer_json"
 }
 
-# Inject or remove --publish from runArgs based on DEVC_API_PORT env var.
-# When set, publishes the port on localhost. When unset, removes any --publish
-# entries so containers don't clash (especially across worktrees).
+# Inject or remove --publish from runArgs based on DEVC_PUBLISH_PORT env var.
+# DEVC_BIND_HOST controls the bind address (default: 127.0.0.1).
+# When unset, removes any --publish entries so containers don't clash.
 setup_port_publishing() {
 	local devcontainer_json="$1/.devcontainer/devcontainer.json"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
 	local updated
-	if [[ -n "${DEVC_API_PORT:-}" ]]; then
-		if ! [[ "$DEVC_API_PORT" =~ ^[0-9]+$ ]] || ((DEVC_API_PORT < 1 || DEVC_API_PORT > 65535)); then
-			log_error "DEVC_API_PORT must be a port number (1-65535), got: $DEVC_API_PORT"
+	if [[ -n "${DEVC_PUBLISH_PORT:-}" ]]; then
+		if ! [[ "$DEVC_PUBLISH_PORT" =~ ^[0-9]+$ ]] || ((DEVC_PUBLISH_PORT < 1 || DEVC_PUBLISH_PORT > 65535)); then
+			log_error "DEVC_PUBLISH_PORT must be a port number (1-65535), got: $DEVC_PUBLISH_PORT"
 			exit 1
 		fi
-		local publish_arg="--publish=127.0.0.1:${DEVC_API_PORT}:8000"
-		log_info "Publishing port ${DEVC_API_PORT} → container 8000"
+		local bind_host="${DEVC_BIND_HOST:-127.0.0.1}"
+		if [[ "$bind_host" != "127.0.0.1" && "$bind_host" != "0.0.0.0" ]]; then
+			log_error "DEVC_BIND_HOST must be 127.0.0.1 or 0.0.0.0, got: $bind_host"
+			exit 1
+		fi
+		if [[ "$bind_host" == "0.0.0.0" ]]; then
+			log_warn "Binding to 0.0.0.0 — port ${DEVC_PUBLISH_PORT} exposed on all interfaces"
+		fi
+		local publish_arg="--publish=${bind_host}:${DEVC_PUBLISH_PORT}:${DEVC_PUBLISH_PORT}"
+		log_info "Publishing port ${bind_host}:${DEVC_PUBLISH_PORT}"
 		updated=$(jq --arg pub "$publish_arg" '
       .runArgs = ((.runArgs // []) | map(select(startswith("--publish") | not))) + [$pub]
     ' "$devcontainer_json") || {
@@ -609,8 +617,11 @@ HEADER
 	fi
 
 	# Host-side only vars — consumed by devc before container start
-	echo "# Optional — expose container port 8000 on this host port (omit to skip)"
-	echo "# DEVC_API_PORT=8000"
+	echo "# Optional — publish a container port to the host (omit to skip)"
+	echo "# DEVC_PUBLISH_PORT=8000"
+	echo ""
+	echo "# Optional — bind address for published port (default: 127.0.0.1, use 0.0.0.0 for remote access)"
+	echo "# DEVC_BIND_HOST=127.0.0.1"
 	echo ""
 	echo "# Optional — GPU passthrough: \"all\" or number of GPUs (requires NVIDIA Container Toolkit)"
 	echo "# DEVC_GPU=all"
