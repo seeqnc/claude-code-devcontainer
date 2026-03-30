@@ -131,8 +131,11 @@ SEP='\033[2m│\033[0m'
 # Get short model name (e.g., "Opus" instead of "Claude 3.5 Opus")
 short_model=$(echo "$model_name" | sed -E 's/Claude [0-9.]+ //; s/^Claude //')
 
-# LINE 1: [Model] folder | branch
+# LINE 1: [Model] [devc] folder | branch
 line1=$(printf '\033[37m[%s]\033[0m' "$short_model")
+if [ "${DEVCONTAINER:-}" = "true" ]; then
+    line1="$line1 $(printf '\033[2;35m[devc]\033[0m')"
+fi
 line1="$line1 $(printf '\033[94m📁 %s\033[0m' "$folder_name")"
 if [ -n "$git_branch" ]; then
     line1="$line1 $(printf '%b \033[96m🌿 %s\033[0m' "$SEP" "$git_branch")"
