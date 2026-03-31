@@ -295,7 +295,10 @@ setup_signing_key() {
 		local updated
 		updated=$(jq --arg target "$container_target" '
       .mounts = ((.mounts // []) | map(select(contains("target=" + $target + ",") or endswith("target=" + $target) | not)))
-    ' "$devcontainer_json") || return 0
+    ' "$devcontainer_json") || {
+			log_warn "jq failed cleaning signing key mount from $devcontainer_json"
+			return 0
+		}
 		echo "$updated" >"$devcontainer_json"
 	fi
 }
@@ -586,6 +589,7 @@ cmd_env() {
 		ANTHROPIC_API_KEY
 		EXA_API_KEY
 		GEMINI_API_KEY
+		NGROK_AUTH_TOKEN
 	)
 
 	# Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var
@@ -663,6 +667,7 @@ cmd_mount() {
 	load_env_file "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_signing_key "$workspace_folder"
 
 	log_info "Adding mount: $host_path → $container_path"
 	update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "$readonly"

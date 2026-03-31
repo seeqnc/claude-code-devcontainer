@@ -5,6 +5,7 @@ FROM ghcr.io/astral-sh/uv:${UV_VERSION}@sha256:78a7ff97cd27b7124a5f3c2aefe146170
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae
 
 ARG TZ
+ARG TARGETARCH
 ENV TZ="$TZ"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -36,8 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install git-delta
 ARG GIT_DELTA_VERSION=0.18.2
-RUN ARCH=$(dpkg --print-architecture) && \
-  curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" -o /tmp/git-delta.deb && \
+RUN curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${TARGETARCH}.deb" -o /tmp/git-delta.deb && \
   dpkg -i /tmp/git-delta.deb && \
   rm /tmp/git-delta.deb
 
@@ -46,13 +46,15 @@ COPY --from=uv /uv /usr/local/bin/uv
 
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
 ARG FZF_VERSION=0.70.0
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) FZF_ARCH="linux_amd64" ;; \
-    arm64) FZF_ARCH="linux_arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-${FZF_ARCH}.tar.gz" | tar -xz -C /usr/local/bin
+RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
+
+# Install ngrok
+RUN curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
+  echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+  | tee /etc/apt/sources.list.d/ngrok.list && \
+  apt-get update && apt-get install -y --no-install-recommends ngrok && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
@@ -103,6 +105,10 @@ RUN curl -fsSL https://pixi.sh/install.sh | bash -s -- --no-path-update
 # Install ast-grep (AST-based code search)
 RUN uv tool install ast-grep-cli
 
+# Install Python LSP tools
+RUN uv tool install basedpyright && \
+  uv tool install ruff
+
 # Install fnm (Fast Node Manager) and Node 22
 ARG NODE_VERSION=22
 ENV FNM_DIR="/home/vscode/.fnm"
@@ -122,26 +128,20 @@ RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.
 # Install zoxide (smart cd)
 RUN curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
+# Install task (Taskfile runner)
+ARG TASK_VERSION=3.49.1
+RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
+
 # Install lazygit
 ARG LAZYGIT_VERSION=0.44.1
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) LG_ARCH="x86_64" ;; \
-    arm64) LG_ARCH="arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${LG_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
 
 # Install neovim
-ARG NVIM_VERSION=0.11.6
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) NV_ARCH="x86_64" ;; \
-    arm64) NV_ARCH="arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${NV_ARCH}.tar.gz" | tar -xz -C /opt && \
-  mv /opt/nvim-linux-${NV_ARCH} /opt/nvim && \
+ARG NVIM_VERSION=0.12.0
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${GNU_ARCH}.tar.gz" | tar -xz -C /opt && \
+  mv /opt/nvim-linux-${GNU_ARCH} /opt/nvim && \
   ln -sf /opt/nvim/bin/nvim /home/vscode/.local/bin/nvim
 
 # Install deno
@@ -191,7 +191,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL NGROK_AUTH_TOKEN; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var

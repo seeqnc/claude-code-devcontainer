@@ -2,6 +2,7 @@ return {
 	-- Treesitter: syntax highlighting + text objects
 	{
 		"nvim-treesitter/nvim-treesitter",
+		build = ":TSUpdate",
 		config = function()
 			local ok, ts_configs = pcall(require, "nvim-treesitter.configs")
 			if not ok then
@@ -136,7 +137,7 @@ return {
 				capabilities = cmp_lsp.default_capabilities(capabilities)
 			end
 
-			local servers = { "pyright", "ts_ls" }
+			local servers = { "basedpyright", "ruff", "ts_ls" }
 			for _, server in ipairs(servers) do
 				vim.lsp.config(server, { capabilities = capabilities })
 			end

@@ -162,11 +162,11 @@ def setup_global_claude_md():
     default_claude_md = Path("/opt/dotfiles/.claude/CLAUDE.md")
     target_claude_md = claude_dir / "CLAUDE.md"
 
-    if not host_claude_md.is_file() or not default_claude_md.is_file():
+    if not host_claude_md.is_file() and not default_claude_md.is_file():
         log_warn(f"No host or default CLAUDE.md found: {host_claude_md}, {default_claude_md}")
         return
 
-    source_claude_md = host_claude_md if host_claude_md.exists() else default_claude_md
+    source_claude_md = host_claude_md if host_claude_md.is_file() else default_claude_md
 
     try:
         content = source_claude_md.read_text(encoding="utf-8").strip()
@@ -175,7 +175,7 @@ def setup_global_claude_md():
             log(f"Global CLAUDE.md installed from {source_claude_md}")
         else:
             log(f"CLAUDE.md from {source_claude_md} is empty, using default from {default_claude_md}")
-            if default_claude_md.exists():
+            if default_claude_md.is_file():
                 shutil.copy2(default_claude_md, target_claude_md)
             else:
                 log_warn(f"Default CLAUDE.md not found at {default_claude_md}")
@@ -188,6 +188,9 @@ def setup_global_claude_md():
     target_docs = claude_dir / "docs"
 
     if not host_docs.is_dir() or not any(host_docs.iterdir()):
+        if target_docs.is_dir():
+            shutil.rmtree(target_docs)
+            log("Removed stale docs (host docs empty or missing)")
         return
 
     target_docs.mkdir(parents=True, exist_ok=True)
@@ -494,6 +497,28 @@ def setup_exa_mcp():
             log_warn(f"Failed to register Exa MCP: {error_detail}")
 
 
+def setup_ngrok():
+    """Configure ngrok auth token if NGROK_AUTH_TOKEN is set."""
+    token = os.environ.get("NGROK_AUTH_TOKEN")
+    if not token:
+        log("NGROK_AUTH_TOKEN not set, skipping ngrok setup")
+        return
+
+    try:
+        subprocess.run(
+            ["ngrok", "config", "add-authtoken", token],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        log("ngrok auth token configured")
+    except FileNotFoundError:
+        log_warn("ngrok not found, skipping auth token setup")
+    except subprocess.CalledProcessError as e:
+        error_detail = e.stderr.strip() if e.stderr else f"exit code {e.returncode}"
+        log_warn(f"Failed to configure ngrok auth token: {error_detail}")
+
+
 def validate_git_worktree():
     """Check if workspace is a git worktree and verify the git dir is accessible."""
     git_file = Path("/workspace/.git")
@@ -530,6 +555,7 @@ def main():
     setup_git_signing()
     setup_codex_config()
     setup_exa_mcp()
+    setup_ngrok()
     validate_git_worktree()
 
     log("Configuration complete!")
