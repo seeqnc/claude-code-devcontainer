@@ -106,7 +106,7 @@ GH_TOKEN=github_pat_...
 OPENAI_API_KEY=...
 CODEX_AZURE_BASE_URL=https://your-endpoint.openai.azure.com/openai/v1/
 EXA_API_KEY=...
-DEVC_API_PORT=8000
+DEVC_PUBLISH_PORT=8000
 ```
 
 Then rebuild:
@@ -186,7 +186,29 @@ You can also run Codex directly from the container.
 
 **Note:** Codex CLI is a separate product from Claude. It doesn't have the same guardrails, so be careful if you run it directly. Don't run `codex --dangerously-bypass-approvals-and-sandbox` in this container. We might implement something similar to the guardrails for Claude later for Codex if there is demand for it.
 
-## 11. Quick reference
+## 11. Signed commits (optional)
+
+If you want commits made inside the container to be signed, point `GIT_SIGNING_KEY` at your SSH signing key:
+
+```bash
+# In .devc.env
+GIT_SIGNING_KEY=~/.ssh/id_ed25519
+```
+
+Then `devc rebuild`. The key is mounted read-only and git is configured to sign commits and tags automatically.
+
+GitHub needs to know about the key too. If you haven't already, add it as a **signing key** (not just authentication) at [https://github.com/settings/keys](https://github.com/settings/keys).
+
+Your `~/.ssh/config` on the **host** should have the same key configured for GitHub:
+
+```
+Host github.com
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+This is the same key you'd use for `git push` over SSH. The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the SSH key is only used for signing — not transport.
+
+## 12. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|

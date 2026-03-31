@@ -5,6 +5,7 @@ FROM ghcr.io/astral-sh/uv:${UV_VERSION}@sha256:78a7ff97cd27b7124a5f3c2aefe146170
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae
 
 ARG TZ
+ARG TARGETARCH
 ENV TZ="$TZ"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -36,8 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install git-delta
 ARG GIT_DELTA_VERSION=0.18.2
-RUN ARCH=$(dpkg --print-architecture) && \
-  curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" -o /tmp/git-delta.deb && \
+RUN curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${TARGETARCH}.deb" -o /tmp/git-delta.deb && \
   dpkg -i /tmp/git-delta.deb && \
   rm /tmp/git-delta.deb
 
@@ -45,14 +45,16 @@ RUN ARCH=$(dpkg --print-architecture) && \
 COPY --from=uv /uv /usr/local/bin/uv
 
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
-ARG FZF_VERSION=0.67.0
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) FZF_ARCH="linux_amd64" ;; \
-    arm64) FZF_ARCH="linux_arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-${FZF_ARCH}.tar.gz" | tar -xz -C /usr/local/bin
+ARG FZF_VERSION=0.70.0
+RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
+
+# Install ngrok
+RUN curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
+  echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+  | tee /etc/apt/sources.list.d/ngrok.list && \
+  apt-get update && apt-get install -y --no-install-recommends ngrok && \
+  apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
@@ -103,6 +105,10 @@ RUN curl -fsSL https://pixi.sh/install.sh | bash -s -- --no-path-update
 # Install ast-grep (AST-based code search)
 RUN uv tool install ast-grep-cli
 
+# Install Python LSP tools
+RUN uv tool install basedpyright && \
+  uv tool install ruff
+
 # Install fnm (Fast Node Manager) and Node 22
 ARG NODE_VERSION=22
 ENV FNM_DIR="/home/vscode/.fnm"
@@ -122,26 +128,20 @@ RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.
 # Install zoxide (smart cd)
 RUN curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
+# Install task (Taskfile runner)
+ARG TASK_VERSION=3.49.1
+RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
+
 # Install lazygit
 ARG LAZYGIT_VERSION=0.44.1
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) LG_ARCH="x86_64" ;; \
-    arm64) LG_ARCH="arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${LG_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
 
 # Install neovim
-ARG NVIM_VERSION=0.11.6
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "${ARCH}" in \
-    amd64) NV_ARCH="x86_64" ;; \
-    arm64) NV_ARCH="arm64" ;; \
-    *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
-  esac && \
-  curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${NV_ARCH}.tar.gz" | tar -xz -C /opt && \
-  mv /opt/nvim-linux-${NV_ARCH} /opt/nvim && \
+ARG NVIM_VERSION=0.12.0
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${GNU_ARCH}.tar.gz" | tar -xz -C /opt && \
+  mv /opt/nvim-linux-${GNU_ARCH} /opt/nvim && \
   ln -sf /opt/nvim/bin/nvim /home/vscode/.local/bin/nvim
 
 # Install deno
@@ -153,16 +153,15 @@ RUN sh -c "$(curl -fsSL https://github.com/deluan/zsh-in-docker/releases/downloa
   -p git \
   -x
 
-# Copy dotfiles into staging dir, then move into place (no-op when .dotfiles/ is empty)
+# Copy dotfiles into staging dir, then move into place
 COPY --chown=vscode:vscode .dotfiles/ /tmp/dotfiles/
-RUN for f in .aliases .exports .functions .vimrc; do \
+RUN for f in .aliases .bash_profile .bashrc .exports .functions .vimrc; do \
       if [ -f "/tmp/dotfiles/$f" ]; then cp "/tmp/dotfiles/$f" "$HOME/$f"; fi; \
     done && \
+    if [ -f /tmp/dotfiles/.zshrc ]; then cp /tmp/dotfiles/.zshrc "$HOME/.zshrc.custom"; fi && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -d /tmp/dotfiles/nvim ]; then cp -r /tmp/dotfiles/nvim "$HOME/.config/nvim"; fi && \
-    if [ -f /tmp/dotfiles/.claude/settings.json ]; then cp /tmp/dotfiles/.claude/settings.json /opt/dotfiles-claude-settings.json; fi && \
-    if [ -f /tmp/dotfiles/.claude/statusline.sh ]; then cp /tmp/dotfiles/.claude/statusline.sh /opt/dotfiles-claude-statusline.sh && chmod +x /opt/dotfiles-claude-statusline.sh; fi && \
-    rm -rf /tmp/dotfiles
+    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi
 
 # Pre-install vim-plug and plugins so vim starts clean without network calls
 ARG VIM_PLUG_VERSION=0.14.0
@@ -171,13 +170,10 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
     (vim -es -u "$HOME/.vimrc" +PlugInstall +qall || true)
 
 # Pre-install lazy.nvim plugins and treesitter parsers so nvim starts clean
-RUN nvim --headless "+Lazy! restore" +qa 2>&1 || true
+# Lazy! sync is blocking (bang = wait), then TSInstallSync compiles parsers.
+# Split into two invocations so lazy plugins are fully on disk before TSInstallSync runs.
+RUN nvim --headless "+Lazy! sync" +qa 2>&1 || true
 RUN nvim --headless "+TSInstallSync bash go json lua markdown python toml typescript yaml" +qa 2>&1 || true
-
-# Copy shell configurations
-COPY --chown=vscode:vscode .bashrc /home/vscode/.bashrc
-COPY --chown=vscode:vscode .bash_profile /home/vscode/.bash_profile
-COPY --chown=vscode:vscode .zshrc /home/vscode/.zshrc.custom
 
 # Container-specific overrides (appended after dotfiles sourcing in .bashrc)
 RUN cat >> /home/vscode/.bashrc <<'CONTAINER'
@@ -195,7 +191,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL NGROK_AUTH_TOKEN; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
