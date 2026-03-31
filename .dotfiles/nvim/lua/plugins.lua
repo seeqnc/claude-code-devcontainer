@@ -127,59 +127,59 @@ return {
 	},
 
 	-- LSP (data-only; configs come from nvim-lspconfig's lsp/ directory)
-		{
+	{
 		"neovim/nvim-lspconfig",
 		config = function()
 			local capabilities = vim.lsp.protocol.make_client_capabilities()
-				local cmp_ok, cmp_lsp = pcall(require, "cmp_nvim_lsp")
-				if cmp_ok then
-					capabilities = cmp_lsp.default_capabilities(capabilities)
-				end
+			local cmp_ok, cmp_lsp = pcall(require, "cmp_nvim_lsp")
+			if cmp_ok then
+				capabilities = cmp_lsp.default_capabilities(capabilities)
+			end
 
-				local servers = { "basedpyright", "ruff", "ts_ls" }
-				for _, server in ipairs(servers) do
-					vim.lsp.config(server, { capabilities = capabilities })
-				end
-				vim.lsp.enable(servers)
+			local servers = { "basedpyright", "ruff", "ts_ls" }
+			for _, server in ipairs(servers) do
+				vim.lsp.config(server, { capabilities = capabilities })
+			end
+			vim.lsp.enable(servers)
 
-				vim.diagnostic.config({
-					virtual_text = {
-						severity = { min = vim.diagnostic.severity.ERROR },
-					},
-					signs = true,
-					underline = true,
-					update_in_insert = false,
-					severity_sort = true,
-					float = {
-						source = "if_many",
-						border = "rounded",
-					},
-				})
+			vim.diagnostic.config({
+				virtual_text = {
+					severity = { min = vim.diagnostic.severity.ERROR },
+				},
+				signs = true,
+				underline = true,
+				update_in_insert = false,
+				severity_sort = true,
+				float = {
+					source = "if_many",
+					border = "rounded",
+				},
+			})
 
-				local diagnostics_enabled = true
-				vim.keymap.set("n", "<leader>td", function()
-					diagnostics_enabled = not diagnostics_enabled
-					vim.diagnostic.enable(diagnostics_enabled)
-					local state = diagnostics_enabled and "enabled" or "disabled"
-					local level = diagnostics_enabled and vim.log.levels.INFO or vim.log.levels.WARN
-					vim.notify("Diagnostics " .. state, level)
-				end, { desc = "Toggle diagnostics" })
+			local diagnostics_enabled = true
+			vim.keymap.set("n", "<leader>td", function()
+				diagnostics_enabled = not diagnostics_enabled
+				vim.diagnostic.enable(diagnostics_enabled)
+				local state = diagnostics_enabled and "enabled" or "disabled"
+				local level = diagnostics_enabled and vim.log.levels.INFO or vim.log.levels.WARN
+				vim.notify("Diagnostics " .. state, level)
+			end, { desc = "Toggle diagnostics" })
 
-				vim.api.nvim_create_autocmd("LspAttach", {
-					callback = function(args)
-						local buf = args.buf
-						local map = function(keys, fn, desc)
-							vim.keymap.set("n", keys, fn, { buffer = buf, desc = desc })
-						end
-						map("gd", vim.lsp.buf.definition, "Go to definition")
-						map("gr", vim.lsp.buf.references, "References")
-						map("gl", vim.diagnostic.open_float, "Diagnostics")
-						map("K", vim.lsp.buf.hover, "Hover")
-						map("<leader>rn", vim.lsp.buf.rename, "Rename")
-						map("<leader>ca", vim.lsp.buf.code_action, "Code action")
-					end,
-				})
-			end,
+			vim.api.nvim_create_autocmd("LspAttach", {
+				callback = function(args)
+					local buf = args.buf
+					local map = function(keys, fn, desc)
+						vim.keymap.set("n", keys, fn, { buffer = buf, desc = desc })
+					end
+					map("gd", vim.lsp.buf.definition, "Go to definition")
+					map("gr", vim.lsp.buf.references, "References")
+					map("gl", vim.diagnostic.open_float, "Diagnostics")
+					map("K", vim.lsp.buf.hover, "Hover")
+					map("<leader>rn", vim.lsp.buf.rename, "Rename")
+					map("<leader>ca", vim.lsp.buf.code_action, "Code action")
+				end,
+			})
+		end,
 	},
 
 	-- Formatting

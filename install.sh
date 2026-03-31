@@ -296,8 +296,12 @@ setup_signing_key() {
 		updated=$(jq --arg target "$container_target" '
       .mounts = ((.mounts // []) | map(select(contains("target=" + $target + ",") or endswith("target=" + $target) | not)))
     ' "$devcontainer_json") || {
-			log_warn "jq failed cleaning signing key mount from $devcontainer_json"
-			return 0
+			log_error "jq failed cleaning signing key mount from $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
 		}
 		echo "$updated" >"$devcontainer_json"
 	fi
@@ -345,7 +349,14 @@ setup_worktree_mount() {
 		local updated
 		updated=$(jq '
       .mounts = ((.mounts // []) | map(select(test("target=.*/\\.git,") | not)))
-    ' "$devcontainer_json" 2>/dev/null) || return 0
+    ' "$devcontainer_json") || {
+			log_error "jq failed cleaning worktree mount from $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
 		echo "$updated" >"$devcontainer_json"
 	fi
 }
@@ -408,8 +419,14 @@ merge_mounts_from_file() {
 	local updated
 	updated=$(jq --argjson custom "$custom_mounts" '
     .mounts = ((.mounts // []) + $custom | unique)
-  ' "$devcontainer_json")
-
+  ' "$devcontainer_json") || {
+		log_error "jq failed updating $devcontainer_json"
+		return 1
+	}
+	[[ -n "$updated" ]] || {
+		log_error "jq produced empty output for $devcontainer_json"
+		return 1
+	}
 	echo "$updated" >"$devcontainer_json"
 }
 
@@ -429,8 +446,14 @@ update_devcontainer_mounts() {
       ((.mounts // []) | map(select(contains("target=" + $target + ",") or endswith("target=" + $target) | not)))
       + [$mount]
     )
-  ' "$devcontainer_json")
-
+  ' "$devcontainer_json") || {
+		log_error "jq failed updating $devcontainer_json"
+		return 1
+	}
+	[[ -n "$updated" ]] || {
+		log_error "jq produced empty output for $devcontainer_json"
+		return 1
+	}
 	echo "$updated" >"$devcontainer_json"
 }
 
@@ -665,8 +688,10 @@ cmd_mount() {
 	check_devcontainer_cli
 
 	load_env_file "$workspace_folder"
+	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_extra_packages "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 
 	log_info "Adding mount: $host_path → $container_path"
@@ -788,8 +813,7 @@ sync_get_claude_projects_dir() {
 	local cid="$1"
 	local claude_dir
 
-	claude_dir=$(docker inspect --format '{{json .Config.Env}}' "$cid" |
-		tr ',' '\n' | tr -d '[]"' |
+	claude_dir=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$cid" |
 		grep '^CLAUDE_CONFIG_DIR=' |
 		cut -d= -f2- || true)
 

@@ -186,7 +186,7 @@ You can also run Codex directly from the container.
 
 **Note:** Codex CLI is a separate product from Claude. It doesn't have the same guardrails, so be careful if you run it directly. Don't run `codex --dangerously-bypass-approvals-and-sandbox` in this container. We might implement something similar to the guardrails for Claude later for Codex if there is demand for it.
 
-## 10. Signed commits (optional)
+## 11. Signed commits (optional)
 
 If you want commits made inside the container to be signed, point `GIT_SIGNING_KEY` at your SSH signing key:
 
@@ -208,7 +208,7 @@ Host github.com
 
 This is the same key you'd use for `git push` over SSH. The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the SSH key is only used for signing — not transport.
 
-## 11. Quick reference
+## 12. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|

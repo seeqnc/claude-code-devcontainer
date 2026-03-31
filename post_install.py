@@ -179,10 +179,8 @@ def setup_global_claude_md():
                 shutil.copy2(default_claude_md, target_claude_md)
             else:
                 log_warn(f"Default CLAUDE.md not found at {default_claude_md}")
-    except FileNotFoundError:
-        log("No host CLAUDE.md found, skipping")
     except OSError as e:
-        log_warn(f"could not read host CLAUDE.md: {e}")
+        log_warn(f"could not read/write CLAUDE.md: {e}")
 
     host_docs = Path("/opt/host-claude/docs")
     target_docs = claude_dir / "docs"
@@ -527,7 +525,8 @@ def validate_git_worktree():
 
     try:
         content = git_file.read_text(encoding="utf-8").strip()
-    except OSError:
+    except OSError as e:
+        log_warn(f"could not read {git_file}: {e}")
         return
     if not content.startswith("gitdir:"):
         return
