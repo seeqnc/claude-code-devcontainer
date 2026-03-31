@@ -159,13 +159,10 @@ return {
 				local diagnostics_enabled = true
 				vim.keymap.set("n", "<leader>td", function()
 					diagnostics_enabled = not diagnostics_enabled
-					if diagnostics_enabled then
-						vim.diagnostic.enable()
-						vim.notify("Diagnostics enabled", vim.log.levels.INFO)
-					else
-						vim.diagnostic.disable()
-						vim.notify("Diagnostics disabled", vim.log.levels.WARN)
-					end
+					vim.diagnostic.enable(diagnostics_enabled)
+					local state = diagnostics_enabled and "enabled" or "disabled"
+					local level = diagnostics_enabled and vim.log.levels.INFO or vim.log.levels.WARN
+					vim.notify("Diagnostics " .. state, level)
 				end, { desc = "Toggle diagnostics" })
 
 				vim.api.nvim_create_autocmd("LspAttach", {
