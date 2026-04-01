@@ -1,28 +1,9 @@
 return {
 	-- Treesitter: syntax highlighting + text objects
+	-- Parsers are pre-compiled during Docker build; no runtime install needed.
 	{
 		"nvim-treesitter/nvim-treesitter",
-		config = function()
-			local ok, ts_configs = pcall(require, "nvim-treesitter.configs")
-			if not ok then
-				vim.schedule(function()
-					vim.notify(
-						"nvim-treesitter not available yet. Run :Lazy sync and restart Neovim.",
-						vim.log.levels.WARN
-					)
-				end)
-				return
-			end
-
-			ts_configs.setup({
-				ensure_installed = {
-					"bash", "go", "json", "lua", "markdown", "python",
-					"toml", "typescript", "yaml",
-				},
-				highlight = { enable = true },
-				indent = { enable = true },
-			})
-		end,
+		lazy = false,
 	},
 
 	-- Telescope: fuzzy finder
@@ -114,12 +95,13 @@ return {
 				provider = minuet_provider,
 				provider_options = {
 					claude = {
-						api_key = os.getenv("ANTHROPIC_API_KEY"),
+						api_key = "ANTHROPIC_API_KEY",
 						model = vim.env.MINUET_CLAUDE_MODEL or "claude-sonnet-4-20250514",
 					},
 					openai = {
-						api_key = os.getenv("OPENAI_API_KEY"),
-						model = vim.env.MINUET_OPENAI_MODEL or "codex-mini-latest",
+						api_key = "OPENAI_API_KEY",
+						model = vim.env.MINUET_OPENAI_MODEL or "gpt-5.4",
+                        end_point = "https://sqnc-claude-foundry.openai.azure.com/openai/v1/chat/completions",
 					},
 				},
 			})
