@@ -163,8 +163,8 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 
 # Install tree-sitter CLI (needed by nvim-treesitter to compile parsers)
 ARG TREE_SITTER_VERSION=0.26.7
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
-  curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-${GNU_ARCH}.gz" | gunzip > /home/vscode/.local/bin/tree-sitter && \
+RUN TS_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-${TS_ARCH}.gz" | gunzip > /home/vscode/.local/bin/tree-sitter && \
   chmod +x /home/vscode/.local/bin/tree-sitter
 
 # Pre-install lazy.nvim plugins and treesitter parsers so nvim starts clean
