@@ -6,9 +6,7 @@
 	"features": {
 		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
-	"runArgs": [
-		"--cap-add=NET_ADMIN"
-	],
+	"runArgs": [],
 	"init": true,
 	"updateRemoteUserUID": true,
 	"customizations": {

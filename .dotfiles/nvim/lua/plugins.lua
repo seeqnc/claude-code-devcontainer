@@ -101,7 +101,9 @@ return {
 					openai = {
 						api_key = "OPENAI_API_KEY",
 						model = vim.env.MINUET_OPENAI_MODEL or "gpt-5.4",
-                        end_point = "https://sqnc-claude-foundry.openai.azure.com/openai/v1/chat/completions",
+						end_point = vim.env.CODEX_AZURE_BASE_URL
+							and (vim.env.CODEX_AZURE_BASE_URL .. "/chat/completions")
+							or nil,
 					},
 				},
 			})
