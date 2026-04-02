@@ -613,7 +613,6 @@ cmd_env() {
 		ANTHROPIC_API_KEY
 		EXA_API_KEY
 		GEMINI_API_KEY
-		NGROK_AUTH_TOKEN
 	)
 
 	# Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var

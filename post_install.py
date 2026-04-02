@@ -495,28 +495,6 @@ def setup_exa_mcp():
             log_warn(f"Failed to register Exa MCP: {error_detail}")
 
 
-def setup_ngrok():
-    """Configure ngrok auth token if NGROK_AUTH_TOKEN is set."""
-    token = os.environ.get("NGROK_AUTH_TOKEN")
-    if not token:
-        log("NGROK_AUTH_TOKEN not set, skipping ngrok setup")
-        return
-
-    try:
-        subprocess.run(
-            ["ngrok", "config", "add-authtoken", token],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        log("ngrok auth token configured")
-    except FileNotFoundError:
-        log_warn("ngrok not found, skipping auth token setup")
-    except subprocess.CalledProcessError as e:
-        error_detail = e.stderr.strip() if e.stderr else f"exit code {e.returncode}"
-        log_warn(f"Failed to configure ngrok auth token: {error_detail}")
-
-
 def validate_git_worktree():
     """Check if workspace is a git worktree and verify the git dir is accessible."""
     git_file = Path("/workspace/.git")
@@ -554,7 +532,6 @@ def main():
     setup_git_signing()
     setup_codex_config()
     setup_exa_mcp()
-    setup_ngrok()
     validate_git_worktree()
 
     log("Configuration complete!")

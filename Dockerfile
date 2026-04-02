@@ -48,14 +48,6 @@ COPY --from=uv /uv /usr/local/bin/uv
 ARG FZF_VERSION=0.70.0
 RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
 
-# Install ngrok
-RUN curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
-  echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
-  | tee /etc/apt/sources.list.d/ngrok.list && \
-  apt-get update && apt-get install -y --no-install-recommends ngrok && \
-  apt-get clean && rm -rf /var/lib/apt/lists/*
-
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
   ln -sf /usr/bin/batcat /usr/local/bin/bat
@@ -198,7 +190,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL NGROK_AUTH_TOKEN; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
