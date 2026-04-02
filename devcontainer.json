@@ -67,7 +67,6 @@
 		"GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}"
 	},
 	"initializeCommand": "{ test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\"; } && mkdir -p \"$HOME/.claude/commands\" \"$HOME/.claude/skills\" \"$HOME/.claude/rules\" \"$HOME/.claude/docs\" && { test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\"; }",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
 	"workspaceFolder": "/workspace",
 	"postCreateCommand": "uv run --no-project /opt/post_install.py"
 }
