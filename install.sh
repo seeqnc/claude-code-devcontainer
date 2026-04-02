@@ -488,6 +488,7 @@ cmd_template() {
 
 	# Copy template files
 	cp "$SCRIPT_DIR/Dockerfile" "$devcontainer_dir/"
+	cp "$SCRIPT_DIR/docker-compose.yml" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
 
