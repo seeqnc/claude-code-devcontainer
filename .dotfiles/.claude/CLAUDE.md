@@ -207,8 +207,6 @@ Key principles (always apply):
 - Assume `prometheus` for monitoring
 - Assume `grafana` for observability
 - Assume `loki` for logging
-- Assume `cert-manager` for TLS
-- Assume `external-dns` for DNS
 - Assume `traefik` for ingress
 - Assume `velero` for backups
 

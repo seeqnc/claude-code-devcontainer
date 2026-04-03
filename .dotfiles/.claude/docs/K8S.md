@@ -1,9 +1,9 @@
 ## Kubernetes
 
 ### API & Structure
-- Use latest stable API version (`kubectl api-resources` to check)
+- Use `kubectl api-resources` to check stable API versions
 - YAML only, no JSON
-- One manifest per resource, organized: `k8s/base/`, `k8s/overlays/{dev,staging,prod}/`
+- One manifest per resource, organized: `k8s/base/`, `k8s/overlays/{dev,test,prod}/`
 - Use Kustomize for environment variations; avoid copy-pasting manifests
 - Pin image tags to immutable versions (SHA digests or semver), never `latest`
 
@@ -39,9 +39,10 @@ securityContext:
 - Set `topologySpreadConstraints` or pod anti-affinity for HA workloads
 
 ### Config & Secrets
-- Externalize all config into ConfigMaps
+- Externalize config into ConfigMaps
 - Never commit plaintext Secrets to git — assume GCP Secrets Manager or Hashicorp Vault is in place
 - Use `envFrom` to inject full ConfigMaps; prefer volume mounts for large configs
 
 ### Networking
 - Provide an Ingress for API / UI services
+- Assume TLS termination is handled by a load balancer – NEVER add TLS block to the application
