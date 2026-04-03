@@ -186,27 +186,57 @@ You can also run Codex directly from the container.
 
 **Note:** Codex CLI is a separate product from Claude. It doesn't have the same guardrails, so be careful if you run it directly. Don't run `codex --dangerously-bypass-approvals-and-sandbox` in this container. We might implement something similar to the guardrails for Claude later for Codex if there is demand for it.
 
-## 11. Signed commits (optional)
+## 11. Signed commits
 
-If you want commits made inside the container to be signed, point `GIT_SIGNING_KEY` at your SSH signing key:
+All commits made inside the devcontainer must be signed. Follow the steps below to create a key, register it, and configure both your host and the devcontainer.
+
+### Create a signing key
+
+```bash
+ssh-keygen -t ed25519 -a 32 -C "your-email@seeqnc.com" -f ~/.ssh/github_signing
+```
+
+A passphrase is **required** — enter one when prompted. You can name the key anything you like.
+
+### Register on GitHub
+
+1. Go to [GitHub SSH keys settings](https://github.com/settings/keys)
+2. Click **New SSH key**
+3. Set **Key type** to **Signing Key**
+4. Paste the contents of `~/.ssh/github_signing.pub` into the **Key** field
+5. Give it a title you'll recognize and save
+
+### Configure git on your host
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/github_signing.pub
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+```
+
+To avoid entering the passphrase on every commit on your **host** (macOS):
+
+```bash
+ssh-add --apple-use-keychain ~/.ssh/github_signing
+```
+
+### Point the devcontainer at your key
 
 ```bash
 # In .devc.env
-GIT_SIGNING_KEY=~/.ssh/id_ed25519
+GIT_SIGNING_KEY=~/.ssh/github_signing
 ```
 
-Then `devc rebuild`. The key is mounted read-only and git is configured to sign commits and tags automatically.
+This key is only used for signing. Push/pull access is handled by `GH_TOKEN` via the `gh` credential helper — no SSH key needed for transport.
 
-GitHub needs to know about the key too. If you haven't already, add it as a **signing key** (not just authentication) at [https://github.com/settings/keys](https://github.com/settings/keys).
+### How it works inside the container
 
-Your `~/.ssh/config` on the **host** should have the same key configured for GitHub:
-
-```
-Host github.com
-    IdentityFile ~/.ssh/id_ed25519
-```
-
-This is the same key you'd use for `git push` over SSH. The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the SSH key is only used for signing — not transport.
+1. Container starts a local ssh-agent (fixed socket at `/tmp/ssh-agent-vscode.sock`)
+2. On first shell, the agent auto-loads the signing key and prompts for the passphrase
+3. All subsequent `git commit` and `git tag` operations use the cached key — no more prompts
+4. The agent persists across terminal sessions within the same container
+5. The host's ssh-agent is never forwarded — only the mounted signing key is available
 
 ## 12. Tailscale networking (optional)
 

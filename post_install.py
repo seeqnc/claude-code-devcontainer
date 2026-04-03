@@ -398,10 +398,9 @@ def setup_git_signing():
         return
 
     content = local_gitconfig.read_text(encoding="utf-8")
-    if "gpg.format" in content:
-        log("Git signing already configured, skipping")
-        return
 
+    # Always append — git uses last-wins, so container paths override any
+    # host signing config that was inlined earlier in the file.
     block = f"""
 [gpg]
     format = ssh

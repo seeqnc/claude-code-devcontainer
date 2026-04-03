@@ -178,10 +178,33 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 
 ## Architecture
 
+- *Use latest stable API versions for all services and tools*
+- Avoid deprecated APIs and features
+
 ### Configuration
-- assume .env file based config
-- if the service supports a database or cache, support config overrides
-- always use a consistent naming scheme for environment variables and config keys
+- Assume `.env` file based config
+- If the service supports a database or cache, support config overrides
+- Always use a consistent naming scheme for environment variables and config keys
+
+### Docker
+
+See [DOCKER.md](./docs/DOCKER.md) for detailed Docker guidelines.
+Key principles (always apply):
+- Assume `docker-compose` for local development setup;
+- Assume `docker buildx` for multi-arch builds;
+- Always pin base images by digest, not tag (`FROM node@sha256:abc...` not `FROM node:20`)
+- Always use `COPY --from=...` to avoid unnecessary layers
+- Always make sure to have multi-arch support for AMD64 and ARM64
+
+### Kubernetes
+
+See [K8S.md](./docs/K8S.md) for detailed Kubernetes guidelines.
+
+Key principles (always apply):
+- Assume *GCP* for hyperscaler, GKE for managed Kubernetes
+- Assume `kustomize` and `helm` for deployment
+- Assume `argocd` for CI/CD
+- Assume `traefik` for ingress
 
 ### Docker Compose
 - Use `docker-compose` CLI, not `docker compose` if `docker compose` is not available
@@ -189,12 +212,21 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 - Provide a `Grafana` `Prometheus` `Loki` setup in docker compose **production** setup
 - Configure docker compose services to use `Loki` for logging in **production** setup
 
+### CI/CD
+- Assume `github-actions` for main CI/CD
+- Assume `argocd` for GitOps CI/CD
+
+### Observability
+- Assume `prometheus` for monitoring
+- Assume `grafana` for observability
+- Assume `Google Cloud Logging` for logging, support `loki` optionally for self-hosted
+
 ## Corporate Identity / Brand Guidelines
 
 When working on any UI, frontend, marketing material, or branded content,
 read the full CI guidelines before starting:
 
-→ See `./docs/CI.md`
+See [CI.md](./docs/CI.md)
 
 Key principles (always apply):
 - Brand name is always lowercase: `seeqnc`
@@ -214,6 +246,7 @@ Key principles (always apply):
 - Never amend/rebase commits already pushed to shared branches
 - Never push directly to main — use feature branches and PRs
 - Never commit secrets, API keys, or credentials — use `.env` files (gitignored) and environment variables
+- Never create a PR towards an upstream project
 
 **Hooks and worktrees:**
 - Install prek in every repo (`prek install`). Run `prek run` before committing. Configure auto-updates: `prek auto-update --cooldown-days 7`
