@@ -205,16 +205,11 @@ ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_signing -C "your-email@example.com"
 
 Use a passphrase or leave empty — the key is only used for signing, not SSH access.
 
-### Key setup
+### Register on GitHub
 
-Use **separate keys** for signing and GitHub authentication:
+Add the **public** key (`~/.ssh/id_ed25519_signing.pub`) as a **Signing Key** at [https://github.com/settings/keys](https://github.com/settings/keys).
 
-| Purpose | Key | Where to add on GitHub |
-|---------|-----|----------------------|
-| Commit signing | `~/.ssh/id_ed25519_signing` | [SSH keys](https://github.com/settings/keys) as **Signing Key** |
-| GitHub access (push/pull) | `~/.ssh/id_ed25519` | [SSH keys](https://github.com/settings/keys) as **Authentication Key** |
-
-The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the signing key is only used for signing — not transport. Your GitHub authentication key is not needed inside the container.
+This key is only used for signing. Push/pull access is handled by `GH_TOKEN` (set in `.devc.env`) via the `gh` credential helper — no SSH key needed for transport.
 
 ## 12. Tailscale networking (optional)
 
