@@ -208,7 +208,60 @@ Host github.com
 
 This is the same key you'd use for `git push` over SSH. The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the SSH key is only used for signing — not transport.
 
-## 12. Quick reference
+## 12. Tailscale networking (optional)
+
+The devcontainer can join your Tailscale network via a sidecar container. This gives the container a stable hostname on your tailnet — useful for exposing dev servers, webhooks, or APIs without port forwarding.
+
+### Setup
+
+1. Create a [Tailscale OAuth client](https://login.tailscale.com/admin/settings/oauth) with the `devices` scope and the tag `tag:dev-container`.
+
+2. Find the image SHA for your architecture from the [tailscale/tailscale](https://hub.docker.com/r/tailscale/tailscale/tags) Docker Hub page.
+
+3. Add to `.devc.env`:
+
+```bash
+TS_CLIENT_ID=<your-client-id>
+TS_CLIENT_SECRET=<your-client-secret>
+TS_HOSTNAME=ts-devc-yourname
+TS_IMAGE_SHA=sha256:<arch-specific-sha>
+```
+
+4. Run `devc rebuild`. The tailscale sidecar starts first, the devcontainer shares its network stack.
+
+### How it works
+
+`docker-compose.yml` defines two services:
+- **tailscale** — runs the Tailscale daemon, authenticates via OAuth, and creates a device on your tailnet
+- **devcontainer** — uses `network_mode: service:tailscale` to share the tailscale container's network
+
+The devcontainer gets the tailscale IP and hostname. Services listening inside the container are reachable from your tailnet at `http://<TS_HOSTNAME>:<port>`.
+
+### Customization
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `TS_CLIENT_ID` | (required) | Tailscale OAuth client ID |
+| `TS_CLIENT_SECRET` | (required) | Tailscale OAuth client secret |
+| `TS_HOSTNAME` | `ts-devc` | Device hostname on your tailnet |
+| `TS_IMAGE_SHA` | (required) | Architecture-specific image digest |
+| `TS_EXTRA_ARGS` | `--advertise-tags=tag:dev-container` | Additional `tailscaled` arguments |
+
+### Without Tailscale
+
+If you don't need Tailscale, remove `docker-compose.yml` from `.devcontainer/` and change `devcontainer.json` back to a direct Dockerfile build:
+
+```json
+{
+  "build": {
+    "dockerfile": "Dockerfile"
+  }
+}
+```
+
+Remove the `"dockerComposeFile"` and `"service"` keys.
+
+## 13. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|

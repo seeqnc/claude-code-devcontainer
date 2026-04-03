@@ -488,6 +488,7 @@ cmd_template() {
 
 	# Copy template files
 	cp "$SCRIPT_DIR/Dockerfile" "$devcontainer_dir/"
+	cp "$SCRIPT_DIR/docker-compose.yml" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
 
@@ -612,7 +613,6 @@ cmd_env() {
 		ANTHROPIC_API_KEY
 		EXA_API_KEY
 		GEMINI_API_KEY
-		NGROK_AUTH_TOKEN
 	)
 
 	# Shell snippet receives var names as positional args, prints KEY=VALUE for each non-empty var

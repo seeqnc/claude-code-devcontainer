@@ -4,7 +4,7 @@ ARG UV_VERSION=0.10.0
 FROM ghcr.io/astral-sh/uv:${UV_VERSION}@sha256:78a7ff97cd27b7124a5f3c2aefe146170793c56a1e03321dd31a289f6d82a04f AS uv
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae
 
-ARG TZ
+ARG TZ=UTC
 ARG TARGETARCH
 ENV TZ="$TZ"
 
@@ -47,14 +47,6 @@ COPY --from=uv /uv /usr/local/bin/uv
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
 ARG FZF_VERSION=0.70.0
 RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
-
-# Install ngrok
-RUN curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-  | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
-  echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
-  | tee /etc/apt/sources.list.d/ngrok.list && \
-  apt-get update && apt-get install -y --no-install-recommends ngrok && \
-  apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
@@ -169,11 +161,18 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
       "https://raw.githubusercontent.com/junegunn/vim-plug/${VIM_PLUG_VERSION}/plug.vim" && \
     (vim -es -u "$HOME/.vimrc" +PlugInstall +qall || true)
 
+# Install tree-sitter CLI (needed by nvim-treesitter to compile parsers)
+ARG TREE_SITTER_VERSION=0.26.7
+RUN TS_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x64" || echo "$TARGETARCH") && \
+  curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-${TS_ARCH}.gz" | gunzip > /home/vscode/.local/bin/tree-sitter && \
+  chmod +x /home/vscode/.local/bin/tree-sitter
+
 # Pre-install lazy.nvim plugins and treesitter parsers so nvim starts clean
-# Lazy! sync is blocking (bang = wait), then TSInstallSync compiles parsers.
-# Split into two invocations so lazy plugins are fully on disk before TSInstallSync runs.
+# Lazy! sync is blocking (bang = wait). Treesitter install uses the new Lua API
+# with :wait() for synchronous headless installation.
 RUN nvim --headless "+Lazy! sync" +qa 2>&1 || true
-RUN nvim --headless "+TSInstallSync bash go json lua markdown python toml typescript yaml" +qa 2>&1 || true
+RUN nvim --headless "+lua require('nvim-treesitter').install({'bash','go','json','lua','markdown','python','toml','typescript','yaml'}):wait(300000)" +qa 2>&1 || true
+
 
 # Container-specific overrides (appended after dotfiles sourcing in .bashrc)
 RUN cat >> /home/vscode/.bashrc <<'CONTAINER'
@@ -191,7 +190,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL NGROK_AUTH_TOKEN; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
