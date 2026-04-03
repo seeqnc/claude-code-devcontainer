@@ -186,27 +186,27 @@ You can also run Codex directly from the container.
 
 **Note:** Codex CLI is a separate product from Claude. It doesn't have the same guardrails, so be careful if you run it directly. Don't run `codex --dangerously-bypass-approvals-and-sandbox` in this container. We might implement something similar to the guardrails for Claude later for Codex if there is demand for it.
 
-## 11. Signed commits (optional)
+## 11. Signed commits
 
-If you want commits made inside the container to be signed, point `GIT_SIGNING_KEY` at your SSH signing key:
+All commits made inside the devcontainer must be signed. Set `GIT_SIGNING_KEY` to your **signing key** (not your GitHub authentication key):
 
 ```bash
 # In .devc.env
-GIT_SIGNING_KEY=~/.ssh/id_ed25519
+GIT_SIGNING_KEY=~/.ssh/id_ed25519_signing
 ```
 
 Then `devc rebuild`. The key is mounted read-only and git is configured to sign commits and tags automatically.
 
-GitHub needs to know about the key too. If you haven't already, add it as a **signing key** (not just authentication) at [https://github.com/settings/keys](https://github.com/settings/keys).
+### Key setup
 
-Your `~/.ssh/config` on the **host** should have the same key configured for GitHub:
+Use **separate keys** for signing and GitHub authentication:
 
-```
-Host github.com
-    IdentityFile ~/.ssh/id_ed25519
-```
+| Purpose | Key | Where to add on GitHub |
+|---------|-----|----------------------|
+| Commit signing | `~/.ssh/id_ed25519_signing` | [SSH keys](https://github.com/settings/keys) as **Signing Key** |
+| GitHub access (push/pull) | `~/.ssh/id_ed25519` | [SSH keys](https://github.com/settings/keys) as **Authentication Key** |
 
-This is the same key you'd use for `git push` over SSH. The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the SSH key is only used for signing — not transport.
+The devcontainer uses HTTPS (via `gh` credential helper) for push/pull, so the signing key is only used for signing — not transport. Your GitHub authentication key is not needed inside the container.
 
 ## 12. Tailscale networking (optional)
 
