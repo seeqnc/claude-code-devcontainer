@@ -45,4 +45,5 @@ securityContext:
 
 ### Networking
 - Provide an Ingress for API / UI services
-- Assume TLS termination is handled by a load balancer – NEVER add TLS block to the application
+- Assume TLS termination is handled by a load balancer – NEVER add any TLS annotations to the application
+- Assume DNS is handled by external-dns - NEVER add any external-dns annotations to the application
