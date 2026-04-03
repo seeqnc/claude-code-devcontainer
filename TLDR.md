@@ -197,6 +197,14 @@ GIT_SIGNING_KEY=~/.ssh/id_ed25519_signing
 
 Then `devc rebuild`. The key is mounted read-only and git is configured to sign commits and tags automatically.
 
+### Create a signing key
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_signing -C "your-email@example.com"
+```
+
+Use a passphrase or leave empty — the key is only used for signing, not SSH access.
+
 ### Key setup
 
 Use **separate keys** for signing and GitHub authentication:
