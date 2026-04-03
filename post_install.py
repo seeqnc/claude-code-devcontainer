@@ -323,14 +323,7 @@ def setup_global_gitignore():
     # Strip any include of .gitconfig.local — that file IS this file, so
     # including it would create a circular reference. Then remove empty [include] sections.
     host_content = re.sub(r"(?m)^\s*path\s*=\s*.*\.gitconfig\.local\s*$", "", host_raw)
-    host_content = re.sub(r"(?m)^\[include\]\s*\n(?=\[|\Z)", "", host_content)
-
-    # Strip signing config from host — container uses its own paths via setup_git_signing()
-    host_content = re.sub(r"(?m)^\[gpg\]\s*\n(\s+.+\n)*", "", host_content)
-    host_content = re.sub(r'(?m)^\[gpg "ssh"\]\s*\n(\s+.+\n)*', "", host_content)
-    host_content = re.sub(r"(?m)^\s*signingkey\s*=.*\n", "", host_content)
-    host_content = re.sub(r"(?m)^\s*gpgsign\s*=.*\n", "", host_content)
-    host_content = host_content.strip()
+    host_content = re.sub(r"(?m)^\[include\]\s*\n(?=\[|\Z)", "", host_content).strip()
 
     host_section = host_content + "\n\n" if host_content else ""
     # Concatenation (not f-string) because host_content may contain curly braces.
@@ -405,10 +398,9 @@ def setup_git_signing():
         return
 
     content = local_gitconfig.read_text(encoding="utf-8")
-    if "gpg.format" in content:
-        log("Git signing already configured, skipping")
-        return
 
+    # Always append — git uses last-wins, so container paths override any
+    # host signing config that was inlined earlier in the file.
     block = f"""
 [gpg]
     format = ssh
