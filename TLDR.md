@@ -232,7 +232,7 @@ This key is only used for signing. Push/pull access is handled by `GH_TOKEN` via
 
 ### How it works inside the container
 
-1. Container starts a local ssh-agent (fixed socket at `~/.ssh/agent.sock`)
+1. Container starts a local ssh-agent (fixed socket at `/tmp/ssh-agent-vscode.sock`)
 2. On first shell, the agent auto-loads the signing key and prompts for the passphrase
 3. All subsequent `git commit` and `git tag` operations use the cached key — no more prompts
 4. The agent persists across terminal sessions within the same container
