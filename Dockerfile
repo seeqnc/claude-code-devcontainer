@@ -194,6 +194,15 @@ for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
+# Container-local ssh-agent for signing key (not forwarded from host)
+export SSH_AUTH_SOCK="/home/vscode/.ssh/agent.sock"
+if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
+  eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
+fi
+# Auto-add signing key if mounted and not yet loaded
+if [[ -f /home/vscode/.ssh/signing_key ]] && ! ssh-add -l 2>/dev/null | grep -q signing_key; then
+  ssh-add /home/vscode/.ssh/signing_key 2>/dev/null || true
+fi
 CONTAINER
 
 # Append custom zshrc to the main one

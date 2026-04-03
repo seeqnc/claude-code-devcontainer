@@ -200,16 +200,23 @@ Then `devc rebuild`. The key is mounted read-only and git is configured to sign 
 ### Create a signing key
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_signing -C "your-email@example.com"
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_signing -C "your-email@seeqnc.com"
 ```
 
-Use a passphrase or leave empty — the key is only used for signing, not SSH access.
+A passphrase is **required**. You enter it once when the container starts — a container-local ssh-agent caches it for the session. The host's ssh-agent is never forwarded, so only the signing key is available inside the container.
 
 ### Register on GitHub
 
 Add the **public** key (`~/.ssh/id_ed25519_signing.pub`) as a **Signing Key** at [https://github.com/settings/keys](https://github.com/settings/keys).
 
 This key is only used for signing. Push/pull access is handled by `GH_TOKEN` (set in `.devc.env`) via the `gh` credential helper — no SSH key needed for transport.
+
+### How it works
+
+1. Container starts a local ssh-agent (fixed socket at `~/.ssh/agent.sock`)
+2. On first shell, the agent auto-loads the signing key and prompts for the passphrase
+3. All subsequent `git commit` and `git tag` operations use the cached key — no more prompts
+4. The agent persists across terminal sessions within the same container
 
 ## 12. Tailscale networking (optional)
 
