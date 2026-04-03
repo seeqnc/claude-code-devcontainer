@@ -24,7 +24,7 @@
 securityContext:
   runAsNonRoot: true
   runAsUser: 1000
-  runAsGroup: 3000
+  runAsGroup: 1000
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
