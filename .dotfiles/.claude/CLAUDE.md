@@ -181,6 +181,15 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 - *Use latest stable API versions for all services and tools*
 - Avoid deprecated APIs and features
 
+### APIs
+Always provide an OpenAPI Spec.
+
+Key conventions:
+
+- Every endpoint MUST have a descriptive `operationId` (verb-noun, e.g. `getTrackMetadata`) and a `description`.
+- Reuse schemas via `$ref` under `components/schemas`. Never inline the same model twice.
+- Include realistic `examples` on all request/response bodies.
+
 ### Configuration
 - Assume `.env` file based config
 - If the service supports a database or cache, support config overrides
