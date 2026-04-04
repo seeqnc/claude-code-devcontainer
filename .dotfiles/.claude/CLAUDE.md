@@ -98,6 +98,8 @@ Tests in `tests/` directory mirroring package structure. Supply chain: `pip-audi
 
 ### Deno
 
+**Always use Deno and Typescript for new services** unless there's a compelling reason to use Node.js.
+
 - Runtime `deno latest`
 - Frontend framework: `Fresh 2.x` **DO NOT use Fresh 1.7.x**
 - Database: `PostgreSQL`
