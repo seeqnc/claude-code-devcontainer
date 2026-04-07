@@ -81,12 +81,12 @@ USER vscode
 ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:$PATH"
 
 # Install Claude Code natively with marketplace plugins
-RUN curl -fsSL https://claude.ai/install.sh | bash && \
-  claude plugin marketplace add anthropics/skills && \
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN claude plugin marketplace add anthropics/skills && \
   claude plugin marketplace add trailofbits/skills && \
   claude plugin marketplace add trailofbits/skills-curated && \
   claude plugin marketplace add affaan-m/everything-claude-code && \
-  claude plugin install everything-claude-code@everything-claude-code
+  claude plugin install ecc@ecc
 
 # Install Python 3.13 via uv (fast binary download, not source compilation)
 RUN uv python install 3.13 --default
@@ -199,9 +199,12 @@ export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
 if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
   eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
 fi
-# Auto-add signing key if mounted and not yet loaded
-if [[ -f /home/vscode/.ssh/signing_key ]] && ! ssh-add -l 2>/dev/null | grep -q signing_key; then
-  ssh-add /home/vscode/.ssh/signing_key 2>/dev/null || true
+# Auto-add signing key if mounted and not yet in agent
+if [[ -f /home/vscode/.ssh/signing_key ]] && ! ssh-add -l &>/dev/null; then
+  # Only prompt in interactive shells (TTY available)
+  if [[ -t 0 ]]; then
+    ssh-add /home/vscode/.ssh/signing_key
+  fi
 fi
 CONTAINER
 
