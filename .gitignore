@@ -5,6 +5,7 @@ __pycache__/
 .idea/
 /.dotfiles/nvim/lazy-lock.json
 .devc.env
+docker-compose.gpu.yml
 .envrc
 .ts
 !/.dotfiles/.claude/

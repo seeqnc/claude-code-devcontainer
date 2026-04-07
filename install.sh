@@ -132,15 +132,17 @@ get_workspace_folder() {
 	echo "${1:-$(pwd)}"
 }
 
-# Inject or remove --gpus from runArgs based on DEVC_GPU env var.
+# Create or remove a docker-compose GPU override file based on DEVC_GPU env var.
 # Accepts: "all" or a positive integer (number of GPUs to expose).
-# When unset, removes any --gpus entries from runArgs.
+# When unset, removes the override file and its reference in devcontainer.json.
 setup_gpu_passthrough() {
-	local devcontainer_json="$1/.devcontainer/devcontainer.json"
+	local devcontainer_dir="$1/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
+	local override_file="$devcontainer_dir/docker-compose.gpu.yml"
+	local override_name="docker-compose.gpu.yml"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
-	local updated
 	if [[ -n "${DEVC_GPU:-}" ]]; then
 		DEVC_GPU="${DEVC_GPU,,}"
 		if [[ "$DEVC_GPU" != "all" ]]; then
@@ -149,30 +151,67 @@ setup_gpu_passthrough() {
 				exit 1
 			fi
 		fi
-		local gpus_arg="--gpus=${DEVC_GPU}"
 		log_info "GPU passthrough: ${DEVC_GPU}"
-		updated=$(jq --arg gpu "$gpus_arg" '
-      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not))) + [$gpu]
-    ' "$devcontainer_json") || {
-			log_error "jq failed updating $devcontainer_json"
-			return 1
-		}
-	else
-		updated=$(jq '
-      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not)))
-    ' "$devcontainer_json") || {
-			log_error "jq failed updating $devcontainer_json"
-			return 1
-		}
-	fi
 
-	[[ -n "$updated" ]] || {
-		log_error "jq produced empty output for $devcontainer_json"
-		return 1
-	}
-	local tmp
-	tmp=$(mktemp "${devcontainer_json}.tmp.XXXXXX")
-	echo "$updated" >"$tmp" && mv "$tmp" "$devcontainer_json"
+		local count_val
+		if [[ "$DEVC_GPU" == "all" ]]; then
+			count_val='"all"'
+		else
+			count_val="$DEVC_GPU"
+		fi
+
+		cat >"$override_file" <<GPUYML
+---
+services:
+  devcontainer:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${count_val}
+              capabilities: [gpu]
+GPUYML
+
+		# Add override to dockerComposeFile array if not already present
+		local updated
+		updated=$(jq --arg gpu "$override_name" '
+      if .dockerComposeFile | type == "string" then
+        .dockerComposeFile = [.dockerComposeFile, $gpu]
+      elif .dockerComposeFile | type == "array" then
+        if (.dockerComposeFile | index($gpu)) then . else .dockerComposeFile += [$gpu] end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	else
+		rm -f "$override_file"
+
+		# Remove override from dockerComposeFile array
+		local updated
+		updated=$(jq --arg gpu "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $gpu))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	fi
 }
 
 # Inject or remove --publish from runArgs based on DEVC_PUBLISH_PORT env var.
