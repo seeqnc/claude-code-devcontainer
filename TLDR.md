@@ -139,6 +139,20 @@ claude login
 
 This opens a browser flow. Your login persists across rebuilds (stored in a Docker volume), so you only do this once.
 
+Alternatively, you can re-use your oAuth token to skip the login wizard:
+
+```bash
+claude setup-token                          # run on host, one-time
+export CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+devc rebuild                                # rebuilds with token
+```
+
+The token is forwarded into the container. On each container creation, `post_install.py` runs a one-shot auth handshake so `claude` starts without the login wizard.
+
+This works around Claude Code's interactive onboarding wizard always showing in containers, even with valid credentials ([#8938](https://github.com/anthropics/claude-code/issues/8938)).
+
+If you don't set a token, the interactive login flow works as before.
+
 Normal mode, where Claude asks before running commands:
 
 ```bash
