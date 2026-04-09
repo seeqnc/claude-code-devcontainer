@@ -597,6 +597,14 @@ cmd_template() {
 		cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
 	fi
 
+	# Copy user's env template as .devc.env if it exists and .devc.env doesn't
+	if [[ -f "$SCRIPT_DIR/.devc.env.template" && ! -f "$target_dir/.devc.env" ]]; then
+		cp "$SCRIPT_DIR/.devc.env.template" "$target_dir/.devc.env"
+		log_info "Environment file created from template"
+	elif [[ -f "$SCRIPT_DIR/.devc.env.template" && -f "$target_dir/.devc.env" ]]; then
+		log_info "Environment file exists, skipping template"
+	fi
+
 	# Copy dotfiles (shell configs, aliases, editor configs, etc.)
 	# Uses /. suffix to copy directory contents, not the directory itself
 	mkdir -p "$devcontainer_dir/.dotfiles/.claude"
