@@ -131,8 +131,15 @@ RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH
 
 # Install prek (fast pre-commit hooks in Rust)
 ARG PREK_VERSION=0.3.8
+ARG PREK_SHA_AMD64=80ec6adb9f1883344de52cb943d371ecfd25340c4a6b5b81e2600d27e246cfa1
+ARG PREK_SHA_ARM64=e2119993923e9bdc28aca11f89361197f8c70648cb016bb6103379445e21758a
 RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
-  curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C /home/vscode/.local/bin prek
+  EXPECTED_SHA=$([ "$TARGETARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
+  curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" \
+    -o /tmp/prek.tar.gz && \
+  echo "${EXPECTED_SHA}  /tmp/prek.tar.gz" | sha256sum -c - && \
+  tar -xzf /tmp/prek.tar.gz -C /home/vscode/.local/bin prek && \
+  rm /tmp/prek.tar.gz
 
 # Install neovim
 ARG NVIM_VERSION=0.12.0
