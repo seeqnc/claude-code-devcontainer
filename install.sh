@@ -214,6 +214,66 @@ GPUYML
 	fi
 }
 
+# Add or remove the Tailscale sidecar overlay based on TS_CLIENT_ID and TS_CLIENT_SECRET.
+# When both are set, copies the overlay and adds it to dockerComposeFile.
+# When either is missing, removes the overlay and its reference.
+setup_tailscale() {
+	local devcontainer_dir="$1/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
+	local override_file="$devcontainer_dir/docker-compose.tailscale.yml"
+	local override_name="docker-compose.tailscale.yml"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+
+	if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" ]]; then
+		log_info "Tailscale enabled (TS_CLIENT_ID set)"
+
+		# Copy overlay from template if not already present
+		if [[ -f "$SCRIPT_DIR/docker-compose.tailscale.yml" ]]; then
+			cp "$SCRIPT_DIR/docker-compose.tailscale.yml" "$override_file"
+		fi
+
+		# Add overlay to dockerComposeFile array
+		local updated
+		updated=$(jq --arg ts "$override_name" '
+      if .dockerComposeFile | type == "string" then
+        .dockerComposeFile = [.dockerComposeFile, $ts]
+      elif .dockerComposeFile | type == "array" then
+        if (.dockerComposeFile | index($ts)) then . else .dockerComposeFile += [$ts] end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	else
+		rm -f "$override_file"
+
+		# Remove overlay from dockerComposeFile array
+		local updated
+		updated=$(jq --arg ts "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $ts))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	fi
+}
+
 # Inject or remove --publish from runArgs based on DEVC_PUBLISH_PORT env var.
 # DEVC_BIND_HOST controls the bind address (default: 127.0.0.1).
 # When unset, removes any --publish entries so containers don't clash.
@@ -528,6 +588,7 @@ cmd_template() {
 	# Copy template files
 	cp "$SCRIPT_DIR/Dockerfile" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/docker-compose.yml" "$devcontainer_dir/"
+	cp "$SCRIPT_DIR/docker-compose.tailscale.yml" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
 
@@ -562,6 +623,7 @@ cmd_up() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Starting devcontainer in $workspace_folder..."
@@ -580,6 +642,7 @@ cmd_rebuild() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Rebuilding devcontainer in $workspace_folder..."
@@ -730,6 +793,7 @@ cmd_mount() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 
