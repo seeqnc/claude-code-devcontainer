@@ -129,6 +129,11 @@ ARG LAZYGIT_VERSION=0.44.1
 RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
   curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
 
+# Install prek (fast pre-commit hooks in Rust)
+ARG PREK_VERSION=0.3.8
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
+  curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C /home/vscode/.local/bin prek
+
 # Install neovim
 ARG NVIM_VERSION=0.12.0
 RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
