@@ -363,6 +363,48 @@ setup_extra_packages() {
 	echo "$updated" >"$devcontainer_json"
 }
 
+# Read .devc.mounts from workspace and add bind mounts to devcontainer.json.
+# Format: one mount per line, hostPath=containerPath (comments and blank lines ignored).
+setup_extra_mounts() {
+	local workspace="$1"
+	local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+	local mounts_file="$workspace/.devc.mounts"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+	[[ -f "$mounts_file" ]] || return 0
+
+	local count=0
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" == \#* ]] && continue
+
+		local host_path="${line%%=*}"
+		local container_path="${line#*=}"
+
+		if [[ -z "$host_path" || -z "$container_path" || "$host_path" == "$line" ]]; then
+			log_warn "Skipping invalid mount (expected hostPath=containerPath): $line"
+			continue
+		fi
+
+		# Expand ~ to $HOME
+		host_path="${host_path/#\~/$HOME}"
+
+		if [[ ! -e "$host_path" ]]; then
+			log_warn "Skipping mount (host path not found): $host_path"
+			continue
+		fi
+
+		# Canonicalize to absolute path
+		host_path="$(cd "$(dirname "$host_path")" && pwd)/$(basename "$host_path")"
+
+		update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "false"
+		count=$((count + 1))
+	done <"$mounts_file"
+
+	if [[ "$count" -gt 0 ]]; then
+		log_info "Extra mounts: $count from .devc.mounts"
+	fi
+}
+
 # Inject or remove a signing-key bind mount based on GIT_SIGNING_KEY env var.
 # When set, validates the host path and mounts it read-only into the container.
 # When unset, removes any stale signing-key mount.
@@ -633,6 +675,7 @@ cmd_up() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Starting devcontainer in $workspace_folder..."
 
@@ -652,6 +695,7 @@ cmd_rebuild() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Rebuilding devcontainer in $workspace_folder..."
 
@@ -803,6 +847,7 @@ cmd_mount() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 
 	log_info "Adding mount: $host_path → $container_path"
