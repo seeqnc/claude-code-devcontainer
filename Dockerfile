@@ -138,7 +138,7 @@ RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") &
   curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" \
     -o /tmp/prek.tar.gz && \
   echo "${EXPECTED_SHA}  /tmp/prek.tar.gz" | sha256sum -c - && \
-  tar -xzf /tmp/prek.tar.gz -C /home/vscode/.local/bin prek && \
+  tar -xzf /tmp/prek.tar.gz --strip-components=1 -C /home/vscode/.local/bin && \
   rm /tmp/prek.tar.gz
 
 # Install neovim
