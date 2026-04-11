@@ -221,8 +221,8 @@ setup_tailscale() {
 	[[ -f "$devcontainer_json" ]] || return 0
 
 	if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" ]]; then
-		if [[ -z "${TS_IMAGE_SHA:-}" ]]; then
-			log_error "TS_IMAGE_SHA is required when Tailscale is enabled"
+		if [[ ! "${TS_IMAGE_SHA:-}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+			log_error "TS_IMAGE_SHA must be a sha256 digest (got: ${TS_IMAGE_SHA:-<empty>})"
 			return 1
 		fi
 
@@ -388,9 +388,9 @@ setup_extra_mounts() {
 			continue
 		fi
 
-		# Validate container path is absolute
-		if [[ "$container_path" != /* ]]; then
-			log_warn "Skipping mount (container path must be absolute): $container_path"
+		# Validate container path: must be absolute, no commas (prevent mount option injection)
+		if [[ ! "$container_path" =~ ^/[^,]+$ ]]; then
+			log_warn "Skipping mount (container path must be absolute, no commas): $container_path"
 			continue
 		fi
 
