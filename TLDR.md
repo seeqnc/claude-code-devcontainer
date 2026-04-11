@@ -293,12 +293,19 @@ Services listening inside the container are reachable from your tailnet at `http
 | `TS_CLIENT_ID` | (required) | Tailscale OAuth client ID |
 | `TS_CLIENT_SECRET` | (required) | Tailscale OAuth client secret |
 | `TS_HOSTNAME` | `ts-devc` | Device hostname on your tailnet |
-| `TS_IMAGE_SHA` | (required) | Architecture-specific image digest |
+| `TS_IMAGE_SHA` | (required) | Architecture-specific image digest (`sha256:...`) |
 | `TS_EXTRA_ARGS` | `--advertise-tags=tag:dev-container` | Additional `tailscaled` arguments |
+| `TS_DISABLED` | (unset) | Set to any value to force-disable Tailscale |
 
 ### Without Tailscale
 
-Comment out or remove `TS_CLIENT_ID` and `TS_CLIENT_SECRET` from `.devc.env`, then `devc rebuild`. The devcontainer runs standalone without the sidecar.
+Either comment out `TS_CLIENT_ID` and `TS_CLIENT_SECRET`, or set `TS_DISABLED=1` in `.devc.env`:
+
+```bash
+TS_DISABLED=1
+```
+
+Then `devc rebuild`. The devcontainer runs standalone without the sidecar. `TS_DISABLED` takes precedence — Tailscale is skipped even if credentials are present.
 
 ## 13. Extra packages and mounts
 
