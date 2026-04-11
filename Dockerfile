@@ -208,8 +208,7 @@ done
 unset _var
 # Container-local ssh-agent for signing key (not forwarded from host)
 export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
-if ! ssh-add -l &>/dev/null; then
-  rm -f "$SSH_AUTH_SOCK"
+if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
   eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
 fi
 # Auto-add signing key if mounted and not yet in agent

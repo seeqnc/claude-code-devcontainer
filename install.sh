@@ -153,12 +153,7 @@ setup_gpu_passthrough() {
 		fi
 		log_info "GPU passthrough: ${DEVC_GPU}"
 
-		local count_val
-		if [[ "$DEVC_GPU" == "all" ]]; then
-			count_val='"all"'
-		else
-			count_val="$DEVC_GPU"
-		fi
+		local count_val="$DEVC_GPU"
 
 		cat >"$override_file" <<GPUYML
 ---
@@ -226,11 +221,19 @@ setup_tailscale() {
 	[[ -f "$devcontainer_json" ]] || return 0
 
 	if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" ]]; then
+		if [[ -z "${TS_IMAGE_SHA:-}" ]]; then
+			log_error "TS_IMAGE_SHA is required when Tailscale is enabled"
+			return 1
+		fi
+
 		log_info "Tailscale enabled (TS_CLIENT_ID set)"
 
-		# Copy overlay from template if not already present
+		# Copy overlay from template
 		if [[ -f "$SCRIPT_DIR/docker-compose.tailscale.yml" ]]; then
 			cp "$SCRIPT_DIR/docker-compose.tailscale.yml" "$override_file"
+		else
+			log_error "Tailscale overlay not found: $SCRIPT_DIR/docker-compose.tailscale.yml"
+			return 1
 		fi
 
 		# Add overlay to dockerComposeFile array
@@ -385,6 +388,12 @@ setup_extra_mounts() {
 			continue
 		fi
 
+		# Validate container path is absolute
+		if [[ "$container_path" != /* ]]; then
+			log_warn "Skipping mount (container path must be absolute): $container_path"
+			continue
+		fi
+
 		# Expand ~ to $HOME
 		host_path="${host_path/#\~/$HOME}"
 
@@ -394,7 +403,10 @@ setup_extra_mounts() {
 		fi
 
 		# Canonicalize to absolute path
-		host_path="$(cd "$(dirname "$host_path")" && pwd)/$(basename "$host_path")"
+		host_path="$(realpath "$host_path")" || {
+			log_warn "Skipping mount (could not resolve path): $host_path"
+			continue
+		}
 
 		update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "false"
 		count=$((count + 1))
@@ -630,7 +642,6 @@ cmd_template() {
 	# Copy template files
 	cp "$SCRIPT_DIR/Dockerfile" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/docker-compose.yml" "$devcontainer_dir/"
-	cp "$SCRIPT_DIR/docker-compose.tailscale.yml" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/devcontainer.json" "$devcontainer_dir/"
 	cp "$SCRIPT_DIR/post_install.py" "$devcontainer_dir/"
 

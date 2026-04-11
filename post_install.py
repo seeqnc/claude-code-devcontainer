@@ -279,8 +279,7 @@ def setup_onboarding_bypass():
         )
         if result.returncode != 0:
             print(
-                f"[post_install] claude -p exited {result.returncode}: "
-                f"{result.stderr.strip()}",
+                f"[post_install] claude -p exited {result.returncode}",
                 file=sys.stderr,
             )
     except subprocess.TimeoutExpired:
