@@ -81,12 +81,12 @@ USER vscode
 ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:$PATH"
 
 # Install Claude Code natively with marketplace plugins
-RUN curl -fsSL https://claude.ai/install.sh | bash && \
-  claude plugin marketplace add anthropics/skills && \
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN claude plugin marketplace add anthropics/skills && \
   claude plugin marketplace add trailofbits/skills && \
   claude plugin marketplace add trailofbits/skills-curated && \
   claude plugin marketplace add affaan-m/everything-claude-code && \
-  claude plugin install everything-claude-code@everything-claude-code
+  claude plugin install ecc@ecc
 
 # Install Python 3.13 via uv (fast binary download, not source compilation)
 RUN uv python install 3.13 --default
@@ -128,6 +128,18 @@ RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSIO
 ARG LAZYGIT_VERSION=0.44.1
 RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
   curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
+
+# Install prek (fast pre-commit hooks in Rust)
+ARG PREK_VERSION=0.3.8
+ARG PREK_SHA_AMD64=80ec6adb9f1883344de52cb943d371ecfd25340c4a6b5b81e2600d27e246cfa1
+ARG PREK_SHA_ARM64=e2119993923e9bdc28aca11f89361197f8c70648cb016bb6103379445e21758a
+RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
+  EXPECTED_SHA=$([ "$TARGETARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
+  curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" \
+    -o /tmp/prek.tar.gz && \
+  echo "${EXPECTED_SHA}  /tmp/prek.tar.gz" | sha256sum -c - && \
+  tar -xzf /tmp/prek.tar.gz --strip-components=1 -C /home/vscode/.local/bin && \
+  rm /tmp/prek.tar.gz
 
 # Install neovim
 ARG NVIM_VERSION=0.12.0
@@ -199,9 +211,12 @@ export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
 if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
   eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
 fi
-# Auto-add signing key if mounted and not yet loaded
-if [[ -f /home/vscode/.ssh/signing_key ]] && ! ssh-add -l 2>/dev/null | grep -q signing_key; then
-  ssh-add /home/vscode/.ssh/signing_key 2>/dev/null || true
+# Auto-add signing key if mounted and not yet in agent
+if [[ -f /home/vscode/.ssh/signing_key ]] && ! ssh-add -l &>/dev/null; then
+  # Only prompt in interactive shells (TTY available)
+  if [[ -t 0 ]]; then
+    ssh-add /home/vscode/.ssh/signing_key
+  fi
 fi
 CONTAINER
 

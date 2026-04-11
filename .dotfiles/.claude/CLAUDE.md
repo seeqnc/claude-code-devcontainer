@@ -98,6 +98,8 @@ Tests in `tests/` directory mirroring package structure. Supply chain: `pip-audi
 
 ### Deno
 
+**Always use Deno and Typescript for new services** unless there's a compelling reason to use Node.js.
+
 - Runtime `deno latest`
 - Frontend framework: `Fresh 2.x` **DO NOT use Fresh 1.7.x**
 - Database: `PostgreSQL`
@@ -180,6 +182,15 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 
 - *Use latest stable API versions for all services and tools*
 - Avoid deprecated APIs and features
+
+### APIs
+Always provide an OpenAPI Spec.
+
+Key conventions:
+
+- Every endpoint MUST have a descriptive `operationId` (verb-noun, e.g. `getTrackMetadata`) and a `description`.
+- Reuse schemas via `$ref` under `components/schemas`. Never inline the same model twice.
+- Include realistic `examples` on all request/response bodies.
 
 ### Configuration
 - Assume `.env` file based config

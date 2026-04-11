@@ -5,6 +5,11 @@ __pycache__/
 .idea/
 /.dotfiles/nvim/lazy-lock.json
 .devc.env
+.devc.env.template
+docker-compose.gpu.yml
+# Ignore generated tailscale overlay in project .devcontainer/ dirs (template at repo root is tracked)
+docker-compose.tailscale.yml
+!/docker-compose.tailscale.yml
 .envrc
 .ts
 !/.dotfiles/.claude/

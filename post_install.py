@@ -248,6 +248,77 @@ def deep_merge(base: dict, override: dict) -> dict:
             result[key] = val
     return result
 
+def setup_onboarding_bypass():
+    """Bypass the interactive onboarding wizard when CLAUDE_CODE_OAUTH_TOKEN is set.
+
+    Runs `claude -p` to seed ~/.claude.json with auth state. The subprocess
+    writes the config file during startup before the API call completes, so
+    a timeout is expected and acceptable. After the subprocess finishes (or
+    times out), we check whether ~/.claude.json was populated and only then
+    set hasCompletedOnboarding.
+
+    Workaround for https://github.com/anthropics/claude-code/issues/8938.
+    """
+    token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "").strip()
+    if not token:
+        print(
+            "[post_install] No CLAUDE_CODE_OAUTH_TOKEN set, skipping onboarding bypass",
+            file=sys.stderr,
+        )
+        return
+
+    claude_json = Path.home() / ".claude.json"
+
+    print("[post_install] Running claude -p to populate auth state...", file=sys.stderr)
+    try:
+        result = subprocess.run(
+            ["claude", "-p", "ok"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            print(
+                f"[post_install] claude -p exited {result.returncode}",
+                file=sys.stderr,
+            )
+    except subprocess.TimeoutExpired:
+        print(
+            "[post_install] claude -p timed out (expected on cold start)",
+            file=sys.stderr,
+        )
+    except (FileNotFoundError, OSError) as e:
+        print(
+            f"[post_install] Warning: could not run claude ({e}) — "
+            "onboarding bypass skipped",
+            file=sys.stderr,
+        )
+        return
+
+    if not claude_json.exists():
+        print(
+            f"[post_install] Warning: {claude_json} not created by claude -p — "
+            "onboarding bypass skipped",
+            file=sys.stderr,
+        )
+        return
+
+    config: dict = {}
+    try:
+        config = json.loads(claude_json.read_text())
+    except json.JSONDecodeError as e:
+        print(
+            f"[post_install] Warning: {claude_json} has invalid JSON ({e}), "
+            "starting fresh",
+            file=sys.stderr,
+        )
+
+    config["hasCompletedOnboarding"] = True
+
+    claude_json.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"[post_install] Onboarding bypass configured: {claude_json}", file=sys.stderr
+    )
 
 def setup_claude_settings_from_dotfiles():
     """Merge dotfiles settings.json into container Claude settings.
@@ -525,6 +596,7 @@ def main():
     setup_claude_settings_from_dotfiles()
     setup_claude_statusline()
     setup_tmux_config()
+    setup_onboarding_bypass()
     fix_directory_ownership()
     setup_global_gitignore()
     setup_gh_credential_helper()

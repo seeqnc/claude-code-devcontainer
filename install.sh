@@ -132,15 +132,17 @@ get_workspace_folder() {
 	echo "${1:-$(pwd)}"
 }
 
-# Inject or remove --gpus from runArgs based on DEVC_GPU env var.
+# Create or remove a docker-compose GPU override file based on DEVC_GPU env var.
 # Accepts: "all" or a positive integer (number of GPUs to expose).
-# When unset, removes any --gpus entries from runArgs.
+# When unset, removes the override file and its reference in devcontainer.json.
 setup_gpu_passthrough() {
-	local devcontainer_json="$1/.devcontainer/devcontainer.json"
+	local devcontainer_dir="$1/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
+	local override_file="$devcontainer_dir/docker-compose.gpu.yml"
+	local override_name="docker-compose.gpu.yml"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
-	local updated
 	if [[ -n "${DEVC_GPU:-}" ]]; then
 		DEVC_GPU="${DEVC_GPU,,}"
 		if [[ "$DEVC_GPU" != "all" ]]; then
@@ -149,30 +151,130 @@ setup_gpu_passthrough() {
 				exit 1
 			fi
 		fi
-		local gpus_arg="--gpus=${DEVC_GPU}"
 		log_info "GPU passthrough: ${DEVC_GPU}"
-		updated=$(jq --arg gpu "$gpus_arg" '
-      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not))) + [$gpu]
-    ' "$devcontainer_json") || {
-			log_error "jq failed updating $devcontainer_json"
-			return 1
-		}
-	else
-		updated=$(jq '
-      .runArgs = ((.runArgs // []) | map(select(startswith("--gpus") | not)))
-    ' "$devcontainer_json") || {
-			log_error "jq failed updating $devcontainer_json"
-			return 1
-		}
-	fi
 
-	[[ -n "$updated" ]] || {
-		log_error "jq produced empty output for $devcontainer_json"
-		return 1
-	}
-	local tmp
-	tmp=$(mktemp "${devcontainer_json}.tmp.XXXXXX")
-	echo "$updated" >"$tmp" && mv "$tmp" "$devcontainer_json"
+		local count_val="$DEVC_GPU"
+
+		cat >"$override_file" <<GPUYML
+---
+services:
+  devcontainer:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${count_val}
+              capabilities: [gpu]
+GPUYML
+
+		# Add override to dockerComposeFile array if not already present
+		local updated
+		updated=$(jq --arg gpu "$override_name" '
+      if .dockerComposeFile | type == "string" then
+        .dockerComposeFile = [.dockerComposeFile, $gpu]
+      elif .dockerComposeFile | type == "array" then
+        if (.dockerComposeFile | index($gpu)) then . else .dockerComposeFile += [$gpu] end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	else
+		rm -f "$override_file"
+
+		# Remove override from dockerComposeFile array
+		local updated
+		updated=$(jq --arg gpu "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $gpu))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	fi
+}
+
+# Add or remove the Tailscale sidecar overlay based on TS_CLIENT_ID and TS_CLIENT_SECRET.
+# When both are set, copies the overlay and adds it to dockerComposeFile.
+# When either is missing, removes the overlay and its reference.
+setup_tailscale() {
+	local devcontainer_dir="$1/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
+	local override_file="$devcontainer_dir/docker-compose.tailscale.yml"
+	local override_name="docker-compose.tailscale.yml"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+
+	if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" ]]; then
+		if [[ ! "${TS_IMAGE_SHA:-}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+			log_error "TS_IMAGE_SHA must be a sha256 digest (got: ${TS_IMAGE_SHA:-<empty>})"
+			return 1
+		fi
+
+		log_info "Tailscale enabled (TS_CLIENT_ID set)"
+
+		# Copy overlay from template
+		if [[ -f "$SCRIPT_DIR/docker-compose.tailscale.yml" ]]; then
+			cp "$SCRIPT_DIR/docker-compose.tailscale.yml" "$override_file"
+		else
+			log_error "Tailscale overlay not found: $SCRIPT_DIR/docker-compose.tailscale.yml"
+			return 1
+		fi
+
+		# Add overlay to dockerComposeFile array
+		local updated
+		updated=$(jq --arg ts "$override_name" '
+      if .dockerComposeFile | type == "string" then
+        .dockerComposeFile = [.dockerComposeFile, $ts]
+      elif .dockerComposeFile | type == "array" then
+        if (.dockerComposeFile | index($ts)) then . else .dockerComposeFile += [$ts] end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	else
+		rm -f "$override_file"
+
+		# Remove overlay from dockerComposeFile array
+		local updated
+		updated=$(jq --arg ts "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $ts))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	fi
 }
 
 # Inject or remove --publish from runArgs based on DEVC_PUBLISH_PORT env var.
@@ -262,6 +364,57 @@ setup_extra_packages() {
 		return 1
 	}
 	echo "$updated" >"$devcontainer_json"
+}
+
+# Read .devc.mounts from workspace and add bind mounts to devcontainer.json.
+# Format: one mount per line, hostPath=containerPath (comments and blank lines ignored).
+setup_extra_mounts() {
+	local workspace="$1"
+	local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+	local mounts_file="$workspace/.devc.mounts"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+	[[ -f "$mounts_file" ]] || return 0
+
+	local count=0
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" == \#* ]] && continue
+
+		local host_path="${line%%=*}"
+		local container_path="${line#*=}"
+
+		if [[ -z "$host_path" || -z "$container_path" || "$host_path" == "$line" ]]; then
+			log_warn "Skipping invalid mount (expected hostPath=containerPath): $line"
+			continue
+		fi
+
+		# Validate container path: must be absolute, no commas (prevent mount option injection)
+		if [[ ! "$container_path" =~ ^/[^,]+$ ]]; then
+			log_warn "Skipping mount (container path must be absolute, no commas): $container_path"
+			continue
+		fi
+
+		# Expand ~ to $HOME
+		host_path="${host_path/#\~/$HOME}"
+
+		if [[ ! -e "$host_path" ]]; then
+			log_warn "Skipping mount (host path not found): $host_path"
+			continue
+		fi
+
+		# Canonicalize to absolute path
+		host_path="$(realpath "$host_path")" || {
+			log_warn "Skipping mount (could not resolve path): $host_path"
+			continue
+		}
+
+		update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "false"
+		count=$((count + 1))
+	done <"$mounts_file"
+
+	if [[ "$count" -gt 0 ]]; then
+		log_info "Extra mounts: $count from .devc.mounts"
+	fi
 }
 
 # Inject or remove a signing-key bind mount based on GIT_SIGNING_KEY env var.
@@ -497,6 +650,14 @@ cmd_template() {
 		cp "$SCRIPT_DIR/.devc.env.example" "$target_dir/.devc.env.example"
 	fi
 
+	# Copy user's env template as .devc.env if it exists and .devc.env doesn't
+	if [[ -f "$SCRIPT_DIR/.devc.env.template" && ! -f "$target_dir/.devc.env" ]]; then
+		cp "$SCRIPT_DIR/.devc.env.template" "$target_dir/.devc.env"
+		log_info "Environment file created from template"
+	elif [[ -f "$SCRIPT_DIR/.devc.env.template" && -f "$target_dir/.devc.env" ]]; then
+		log_info "Environment file exists, skipping template"
+	fi
+
 	# Copy dotfiles (shell configs, aliases, editor configs, etc.)
 	# Uses /. suffix to copy directory contents, not the directory itself
 	mkdir -p "$devcontainer_dir/.dotfiles/.claude"
@@ -523,7 +684,9 @@ cmd_up() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Starting devcontainer in $workspace_folder..."
 
@@ -541,7 +704,9 @@ cmd_rebuild() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Rebuilding devcontainer in $workspace_folder..."
 
@@ -691,7 +856,9 @@ cmd_mount() {
 	setup_worktree_mount "$workspace_folder"
 	setup_port_publishing "$workspace_folder"
 	setup_gpu_passthrough "$workspace_folder"
+	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 
 	log_info "Adding mount: $host_path → $container_path"

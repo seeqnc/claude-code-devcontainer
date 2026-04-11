@@ -88,25 +88,30 @@ You also need the Azure endpoint URL. It's on the same Keys and Endpoint page in
 
 ## 5. Export env vars and rebuild
 
-Now that you have your tokens, navigate to the repo you are working on and store them in the `.devc.env` file. `devc rebuild` reads this file automatically.
+Now that you have your tokens, navigate to the repo you are working on and fill in the `.devc.env` file. If you ran `devc .` in step 2 and have a `.devc.env.template` in `~/.claude-devcontainer/`, it was already copied as `.devc.env`. Otherwise, create one from the example:
 
 ```bash
-# Create .devc.env from the template (one-time)
 cd $YOUR_REPO
 cp ~/.claude-devcontainer/.devc.env.example .devc.env
-
-# Edit .devc.env and fill in your values
 $EDITOR .devc.env
 ```
 
-The `.devc.env` file looks like this — fill in the values you have:
+Key variables:
 
 ```bash
+# Required
 GH_TOKEN=github_pat_...
 OPENAI_API_KEY=...
 CODEX_AZURE_BASE_URL=https://your-endpoint.openai.azure.com/openai/v1/
-EXA_API_KEY=...
-DEVC_PUBLISH_PORT=8000
+
+# Required — commit signing (see section 11)
+GIT_SIGNING_KEY=~/.ssh/github_signing
+
+# Optional
+ANTHROPIC_API_KEY=...          # skip interactive `claude login`
+CLAUDE_CODE_OAUTH_TOKEN=...    # skip onboarding wizard (see section 8)
+EXA_API_KEY=...                # Exa AI search
+GEMINI_API_KEY=...             # Gemini CLI for /review-pr
 ```
 
 Then rebuild:
@@ -116,6 +121,8 @@ devc rebuild
 ```
 
 The `.devc.env` file is gitignored and never enters the container — Claude cannot read it. If you change a key later, edit `.devc.env` and run `devc rebuild` again.
+
+**Tip:** Create `~/.claude-devcontainer/.devc.env.template` with your keys pre-filled. On each `devc .`, it's automatically copied as `.devc.env` if one doesn't exist yet.
 
 ## 6. Ignore the dev container files
 
@@ -139,6 +146,22 @@ claude login
 
 This opens a browser flow. Your login persists across rebuilds (stored in a Docker volume), so you only do this once.
 
+Alternatively, you can skip the login wizard with an OAuth token:
+
+```bash
+claude setup-token                          # run on host, one-time — prints the token
+```
+
+Add the token to `.devc.env`:
+
+```bash
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+```
+
+Then `devc rebuild`. On container creation, `post_install.py` runs a one-shot auth handshake so `claude` starts without the login wizard. Workaround for [#8938](https://github.com/anthropics/claude-code/issues/8938).
+
+If you don't set a token, the interactive login flow works as before.
+
 Normal mode, where Claude asks before running commands:
 
 ```bash
@@ -160,8 +183,6 @@ On your actual machine, `--dangerously-skip-permissions` is exactly what it soun
 Inside this devcontainer, that's fine.
 
 Claude can only see `/workspace`. Your home directory, SSH keys, cloud credentials, and other projects don't exist in here.
-
-Even in yolo mode, [pre-tool-use hooks](.claude/settings.json) intercept every command before it runs. They block `eval`, `LD_PRELOAD`, shell injection vectors, credential env var overwrites (`GH_TOKEN`, `ANTHROPIC_API_KEY`, etc.), destructive `gh` operations (merge, delete), `rm -rf /`, Docker socket access, cloud CLI operations, and database drops.
 
 The `.devcontainer/` directory is mounted read-only inside the container, so a compromised process can't modify the Dockerfile or `devcontainer.json` to inject commands that run on your host during the next rebuild. Your fine-grained PAT only has access to the repos you selected. Claude's config and shell history live in Docker volumes, not on your host filesystem.
 
@@ -261,11 +282,9 @@ TS_IMAGE_SHA=sha256:<arch-specific-sha>
 
 ### How it works
 
-`docker-compose.yml` defines two services:
-- **tailscale** — runs the Tailscale daemon, authenticates via OAuth, and creates a device on your tailnet
-- **devcontainer** — uses `network_mode: service:tailscale` to share the tailscale container's network
+When `TS_CLIENT_ID` and `TS_CLIENT_SECRET` are set, `devc` adds a `docker-compose.tailscale.yml` overlay that starts a Tailscale sidecar alongside the devcontainer. The devcontainer shares the sidecar's network via `network_mode: service:tailscale`.
 
-The devcontainer gets the tailscale IP and hostname. Services listening inside the container are reachable from your tailnet at `http://<TS_HOSTNAME>:<port>`.
+Services listening inside the container are reachable from your tailnet at `http://<TS_HOSTNAME>:<port>`.
 
 ### Customization
 
@@ -279,19 +298,45 @@ The devcontainer gets the tailscale IP and hostname. Services listening inside t
 
 ### Without Tailscale
 
-If you don't need Tailscale, remove `docker-compose.yml` from `.devcontainer/` and change `devcontainer.json` back to a direct Dockerfile build:
+Comment out or remove `TS_CLIENT_ID` and `TS_CLIENT_SECRET` from `.devc.env`, then `devc rebuild`. The devcontainer runs standalone without the sidecar.
 
-```json
-{
-  "build": {
-    "dockerfile": "Dockerfile"
-  }
-}
+## 13. Extra packages and mounts
+
+### Extra apt packages
+
+Create `.devc.packages` in your project root (one package per line):
+
+```
+ffmpeg
+libpq-dev
+# This is a comment
 ```
 
-Remove the `"dockerComposeFile"` and `"service"` keys.
+Packages are installed during `devc rebuild` in a cached Dockerfile layer.
 
-## 13. Quick reference
+### Extra bind mounts
+
+Create `.devc.mounts` in your project root (`hostPath=containerPath`, one per line):
+
+```
+~/datasets=/data
+/opt/models=/models
+```
+
+Host paths must exist. `~` is expanded. Mounts are injected on `devc up`/`rebuild`.
+
+### GPU passthrough
+
+Set `DEVC_GPU` in `.devc.env`:
+
+```bash
+DEVC_GPU=all        # all GPUs
+DEVC_GPU=2          # specific count (1-128)
+```
+
+Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). A `docker-compose.gpu.yml` overlay is generated automatically.
+
+## 14. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|
