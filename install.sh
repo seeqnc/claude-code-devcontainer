@@ -220,6 +220,29 @@ setup_tailscale() {
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
+	if [[ -n "${TS_DISABLED:-}" ]]; then
+		log_info "Tailscale disabled (TS_DISABLED set)"
+		rm -f "$override_file"
+
+		local updated
+		updated=$(jq --arg ts "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $ts))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+		return 0
+	fi
+
 	if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" ]]; then
 		if [[ ! "${TS_IMAGE_SHA:-}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
 			log_error "TS_IMAGE_SHA must be a sha256 digest (got: ${TS_IMAGE_SHA:-<empty>})"
