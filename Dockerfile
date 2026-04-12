@@ -207,8 +207,11 @@ for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY
 done
 unset _var
 # Container-local ssh-agent for signing key (not forwarded from host)
+# Exit codes: 0 = has keys, 1 = no keys, 2 = can't connect
 export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
-if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
+ssh-add -l &>/dev/null
+if [[ $? -eq 2 ]]; then
+  rm -f "$SSH_AUTH_SOCK"
   eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
 fi
 # Auto-add signing key if mounted and not yet in agent
