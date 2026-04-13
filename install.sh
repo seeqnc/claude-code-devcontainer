@@ -431,6 +431,12 @@ setup_extra_mounts() {
 			continue
 		}
 
+		# Reject commas in the canonical path (prevent mount option injection)
+		if [[ "$host_path" == *,* ]]; then
+			log_warn "Skipping mount (host path contains comma): $host_path"
+			continue
+		fi
+
 		update_devcontainer_mounts "$devcontainer_json" "$host_path" "$container_path" "false"
 		count=$((count + 1))
 	done <"$mounts_file"
@@ -858,11 +864,22 @@ cmd_mount() {
 
 	[[ "${3:-}" == "--readonly" ]] && readonly="true"
 
+	# Validate container path: absolute, no commas
+	if [[ ! "$container_path" =~ ^/[^,]+$ ]]; then
+		log_error "Container path must be absolute with no commas: $container_path"
+		exit 1
+	fi
+
 	# Expand and validate host path
 	host_path="$(cd "$host_path" 2>/dev/null && pwd)" || {
 		log_error "Host path does not exist: $1"
 		exit 1
 	}
+
+	if [[ "$host_path" == *,* ]]; then
+		log_error "Host path contains comma: $host_path"
+		exit 1
+	fi
 
 	local workspace_folder
 	workspace_folder="$(get_workspace_folder)"
