@@ -86,7 +86,7 @@ RUN claude plugin marketplace add anthropics/skills && \
   claude plugin marketplace add trailofbits/skills && \
   claude plugin marketplace add trailofbits/skills-curated && \
   claude plugin marketplace add affaan-m/everything-claude-code && \
-  claude plugin install ecc@ecc
+  claude plugin install everything-claude-code
 
 # Install Python 3.13 via uv (fast binary download, not source compilation)
 RUN uv python install 3.13 --default
