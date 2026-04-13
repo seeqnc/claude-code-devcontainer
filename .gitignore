@@ -7,6 +7,7 @@ __pycache__/
 .devc.env
 .devc.env.template
 docker-compose.gpu.yml
+docker-compose.packages.yml
 # Ignore generated tailscale overlay in project .devcontainer/ dirs (template at repo root is tracked)
 docker-compose.tailscale.yml
 !/docker-compose.tailscale.yml

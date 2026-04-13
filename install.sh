@@ -346,12 +346,16 @@ setup_port_publishing() {
 	echo "$updated" >"$devcontainer_json"
 }
 
-# Read .devc.packages from workspace and inject as EXTRA_PACKAGES build arg.
-# Packages are installed in a separate cached Dockerfile layer.
+# Read .devc.packages from workspace and generate a docker-compose overlay
+# that sets EXTRA_PACKAGES as a build arg. Packages are installed in a
+# separate cached Dockerfile layer.
 setup_extra_packages() {
 	local workspace="$1"
-	local devcontainer_json="$workspace/.devcontainer/devcontainer.json"
+	local devcontainer_dir="$workspace/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
 	local packages_file="$workspace/.devc.packages"
+	local override_file="$devcontainer_dir/docker-compose.packages.yml"
+	local override_name="docker-compose.packages.yml"
 
 	[[ -f "$devcontainer_json" ]] || return 0
 
@@ -370,14 +374,48 @@ setup_extra_packages() {
 	fi
 
 	if [[ -z "$packages" ]]; then
+		rm -f "$override_file"
+
+		# Remove overlay from dockerComposeFile array
+		local updated
+		updated=$(jq --arg pkg "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $pkg))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
 		return 0
 	fi
 
 	log_info "Extra packages: $packages"
 
+	cat >"$override_file" <<PKGYML
+---
+services:
+  devcontainer:
+    build:
+      args:
+        EXTRA_PACKAGES: "${packages}"
+PKGYML
+
+	# Add overlay to dockerComposeFile array
 	local updated
-	updated=$(jq --arg pkgs "$packages" '
-    .build.args.EXTRA_PACKAGES = $pkgs
+	updated=$(jq --arg pkg "$override_name" '
+    if .dockerComposeFile | type == "string" then
+      .dockerComposeFile = [.dockerComposeFile, $pkg]
+    elif .dockerComposeFile | type == "array" then
+      if (.dockerComposeFile | index($pkg)) then . else .dockerComposeFile += [$pkg] end
+    else .
+    end
   ' "$devcontainer_json") || {
 		log_error "jq failed updating $devcontainer_json"
 		return 1
