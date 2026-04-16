@@ -263,13 +263,17 @@ This key is only used for signing. Push/pull access is handled by `GH_TOKEN` via
 
 The devcontainer can join your Tailscale network via a sidecar container. This gives the container a stable hostname on your tailnet — useful for exposing dev servers, webhooks, or APIs without port forwarding.
 
-### Setup
+### First Time Setup
+
+This is likely not needed if the OAuth client has already been setup. You can get the credential from either Bostjan or Oliver
 
 1. Create a [Tailscale OAuth client](https://login.tailscale.com/admin/settings/oauth) with the `devices` scope and the tag `tag:dev-container`.
 
 2. Find the image SHA for your architecture from the [tailscale/tailscale](https://hub.docker.com/r/tailscale/tailscale/tags) Docker Hub page.
 
-3. Add to `.devc.env`:
+### Adding Tailscale to Dev Container setup
+
+1. Add to `.devc.env`:
 
 ```bash
 TS_CLIENT_ID=<your-client-id>
@@ -278,7 +282,7 @@ TS_HOSTNAME=ts-devc-yourname
 TS_IMAGE_SHA=sha256:<arch-specific-sha>
 ```
 
-4. Run `devc rebuild`. The tailscale sidecar starts first, the devcontainer shares its network stack.
+2. Run `devc rebuild`. The tailscale sidecar starts first, the devcontainer shares its network stack.
 
 ### How it works
 
