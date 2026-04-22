@@ -1,0 +1,10 @@
+---
+services:
+  devcontainer:
+    networks:
+      - default
+      - devshared
+networks:
+  devshared:
+    name: ${DEVC_NETWORK}
+    external: true

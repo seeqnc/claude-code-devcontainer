@@ -427,6 +427,82 @@ PKGYML
 	echo "$updated" >"$devcontainer_json"
 }
 
+# Add or remove a shared Docker network overlay based on DEVC_NETWORK env var.
+# When set, copies the overlay and adds it to dockerComposeFile so the
+# devcontainer can reach services on the project's own compose network.
+# Incompatible with Tailscale (network_mode: service:tailscale replaces all networks).
+setup_shared_network() {
+	local workspace="$1"
+	local devcontainer_dir="$workspace/.devcontainer"
+	local devcontainer_json="$devcontainer_dir/devcontainer.json"
+	local override_file="$devcontainer_dir/docker-compose.network.yml"
+	local override_name="docker-compose.network.yml"
+
+	[[ -f "$devcontainer_json" ]] || return 0
+
+	if [[ -n "${DEVC_NETWORK:-}" ]]; then
+		# Validate network name (Docker allows [a-zA-Z0-9][a-zA-Z0-9_.-]*)
+		if [[ ! "$DEVC_NETWORK" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+			log_error "DEVC_NETWORK must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, got: $DEVC_NETWORK"
+			exit 1
+		fi
+
+		# Tailscale sets network_mode which is incompatible with networks:
+		if [[ -n "${TS_CLIENT_ID:-}" && -n "${TS_CLIENT_SECRET:-}" && -z "${TS_DISABLED:-}" ]]; then
+			log_error "DEVC_NETWORK and Tailscale cannot be used together (network_mode conflict)"
+			exit 1
+		fi
+
+		log_info "Shared network: ${DEVC_NETWORK}"
+
+		if [[ -f "$SCRIPT_DIR/docker-compose.network.yml" ]]; then
+			cp "$SCRIPT_DIR/docker-compose.network.yml" "$override_file"
+		else
+			log_error "Network overlay not found: $SCRIPT_DIR/docker-compose.network.yml"
+			return 1
+		fi
+
+		# Add overlay to dockerComposeFile array
+		local updated
+		updated=$(jq --arg net "$override_name" '
+      if .dockerComposeFile | type == "string" then
+        .dockerComposeFile = [.dockerComposeFile, $net]
+      elif .dockerComposeFile | type == "array" then
+        if (.dockerComposeFile | index($net)) then . else .dockerComposeFile += [$net] end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	else
+		rm -f "$override_file"
+
+		# Remove overlay from dockerComposeFile array
+		local updated
+		updated=$(jq --arg net "$override_name" '
+      if .dockerComposeFile | type == "array" then
+        .dockerComposeFile |= map(select(. != $net))
+        | if (.dockerComposeFile | length) == 1 then .dockerComposeFile = .dockerComposeFile[0] else . end
+      else .
+      end
+    ' "$devcontainer_json") || {
+			log_error "jq failed updating $devcontainer_json"
+			return 1
+		}
+		[[ -n "$updated" ]] || {
+			log_error "jq produced empty output for $devcontainer_json"
+			return 1
+		}
+		echo "$updated" >"$devcontainer_json"
+	fi
+}
+
 # Read .devc.mounts from workspace and add bind mounts to devcontainer.json.
 # Format: one mount per line, hostPath=containerPath (comments and blank lines ignored).
 setup_extra_mounts() {
@@ -753,6 +829,7 @@ cmd_up() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_shared_network "$workspace_folder"
 	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Starting devcontainer in $workspace_folder..."
@@ -773,6 +850,7 @@ cmd_rebuild() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_shared_network "$workspace_folder"
 	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 	log_info "Rebuilding devcontainer in $workspace_folder..."
@@ -876,6 +954,9 @@ HEADER
 	fi
 
 	# Host-side only vars — consumed by devc before container start
+	echo "# Optional — join an external Docker network (e.g., your project's compose network)"
+	echo "# DEVC_NETWORK=devshared"
+	echo ""
 	echo "# Optional — publish a container port to the host (omit to skip)"
 	echo "# DEVC_PUBLISH_PORT=8000"
 	echo ""
@@ -936,6 +1017,7 @@ cmd_mount() {
 	setup_gpu_passthrough "$workspace_folder"
 	setup_tailscale "$workspace_folder"
 	setup_extra_packages "$workspace_folder"
+	setup_shared_network "$workspace_folder"
 	setup_extra_mounts "$workspace_folder"
 	setup_signing_key "$workspace_folder"
 

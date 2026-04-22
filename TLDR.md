@@ -311,7 +311,50 @@ TS_DISABLED=1
 
 Then `devc rebuild`. The devcontainer runs standalone without the sidecar. `TS_DISABLED` takes precedence — Tailscale is skipped even if credentials are present.
 
-## 13. Extra packages and mounts
+## 13. Shared Docker network (optional)
+
+If your project runs its own `docker compose` services (Postgres, Redis, etc.) and you want the devcontainer to reach them by hostname, create a shared external network and point the devcontainer at it.
+
+### Setup
+
+1. Create the network (once, on the host):
+
+```bash
+docker network create devshared
+```
+
+2. Add the network to your project's `docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    networks:
+      - devshared
+
+networks:
+  devshared:
+    external: true
+```
+
+3. Set `DEVC_NETWORK` in `.devc.env`:
+
+```bash
+DEVC_NETWORK=devshared
+```
+
+4. `devc rebuild`. The devcontainer now shares the `devshared` network and can reach `postgres:5432` by service name.
+
+### How it works
+
+When `DEVC_NETWORK` is set, `devc` generates a `docker-compose.network.yml` overlay that attaches the devcontainer to the named external network while keeping the default compose network intact.
+
+### Limitations
+
+- **Incompatible with Tailscale**: Tailscale uses `network_mode: service:tailscale`, which replaces all network settings. `devc` will error if both are enabled.
+- The network must already exist before `devc up`/`rebuild`. Create it with `docker network create <name>`.
+
+## 14. Extra packages and mounts
 
 ### Extra apt packages
 
@@ -347,7 +390,7 @@ DEVC_GPU=2          # specific count (1-128)
 
 Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). A `docker-compose.gpu.yml` overlay is generated automatically.
 
-## 14. Quick reference
+## 15. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|
