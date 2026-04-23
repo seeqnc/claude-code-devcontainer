@@ -368,6 +368,31 @@ def setup_claude_statusline():
         log_warn(f"failed to deploy statusline: {e}")
 
 
+def setup_claude_hooks():
+    """Deploy hook scripts from dotfiles into the volume-mounted Claude config."""
+    staged = Path("/opt/dotfiles/.claude/hooks")
+    if not staged.is_dir():
+        return
+
+    target = Path.home() / ".claude" / "hooks"
+    target.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    for src in staged.iterdir():
+        if not src.is_file():
+            continue
+        dst = target / src.name
+        try:
+            dst.write_bytes(src.read_bytes())
+            dst.chmod(0o755)
+            count += 1
+        except OSError as e:
+            log_warn(f"failed to deploy hook {src.name}: {e}")
+
+    if count:
+        log(f"Claude hooks deployed: {count} script(s) to {target}")
+
+
 def setup_global_gitignore():
     """Set up global gitignore and local git config.
 
@@ -595,6 +620,7 @@ def main():
     setup_claude_settings()
     setup_claude_settings_from_dotfiles()
     setup_claude_statusline()
+    setup_claude_hooks()
     setup_tmux_config()
     setup_onboarding_bypass()
     fix_directory_ownership()

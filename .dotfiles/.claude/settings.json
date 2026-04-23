@@ -3,6 +3,59 @@
 		"type": "command",
 		"command": "~/.claude/statusline.sh"
 	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-rm.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-git-destructive.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-gh.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-publish.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-docker.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-database.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-iac.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-network-exfil.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-shell-bypass.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-cloud-cli.sh"
+					},
+					{
+						"type": "command",
+						"command": "~/.claude/hooks/check-deploy.sh"
+					}
+				]
+			}
+		]
+	},
 	"enabledPlugins": {
 		"code-simplifier@claude-plugins-official": true,
 		"frontend-design@claude-plugins-official": true,
