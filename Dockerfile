@@ -37,7 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install git-delta
 ARG GIT_DELTA_VERSION=0.18.2
-RUN curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${TARGETARCH}.deb" -o /tmp/git-delta.deb && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" -o /tmp/git-delta.deb && \
   dpkg -i /tmp/git-delta.deb && \
   rm /tmp/git-delta.deb
 
@@ -46,7 +47,8 @@ COPY --from=uv /uv /usr/local/bin/uv
 
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
 ARG FZF_VERSION=0.70.0
-RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${ARCH}.tar.gz" | tar -xz -C /usr/local/bin
 
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
@@ -122,19 +124,22 @@ RUN curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install
 
 # Install task (Taskfile runner)
 ARG TASK_VERSION=3.49.1
-RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
 
 # Install lazygit
 ARG LAZYGIT_VERSION=0.44.1
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
 
 # Install prek (fast pre-commit hooks in Rust)
 ARG PREK_VERSION=0.3.8
 ARG PREK_SHA_AMD64=80ec6adb9f1883344de52cb943d371ecfd25340c4a6b5b81e2600d27e246cfa1
 ARG PREK_SHA_ARM64=e2119993923e9bdc28aca11f89361197f8c70648cb016bb6103379445e21758a
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
-  EXPECTED_SHA=$([ "$TARGETARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
+  EXPECTED_SHA=$([ "$ARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
   curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" \
     -o /tmp/prek.tar.gz && \
   echo "${EXPECTED_SHA}  /tmp/prek.tar.gz" | sha256sum -c - && \
@@ -143,7 +148,8 @@ RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") &
 
 # Install neovim
 ARG NVIM_VERSION=0.12.0
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${GNU_ARCH}.tar.gz" | tar -xz -C /opt && \
   mv /opt/nvim-linux-${GNU_ARCH} /opt/nvim && \
   ln -sf /opt/nvim/bin/nvim /home/vscode/.local/bin/nvim
@@ -175,7 +181,8 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 
 # Install tree-sitter CLI (needed by nvim-treesitter to compile parsers)
 ARG TREE_SITTER_VERSION=0.26.7
-RUN TS_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  TS_ARCH=$([ "$ARCH" = "amd64" ] && echo "x64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-${TS_ARCH}.gz" | gunzip > /home/vscode/.local/bin/tree-sitter && \
   chmod +x /home/vscode/.local/bin/tree-sitter
 
