@@ -688,7 +688,12 @@ extract_mounts_to_file() {
         (contains("target=/home/vscode/.claude/skills,") | not) and
         (contains("target=/home/vscode/.claude/rules,") | not) and
         (contains("target=/home/vscode/.claude/docs,") | not) and
-        (contains("target=/home/vscode/.ssh/signing_key,") | not)
+        (contains("target=/home/vscode/.ssh/signing_key,") | not) and
+        (contains("target=/home/vscode/.codex/hooks.json,") | not) and
+        (contains("target=/home/vscode/.codex/skills,") | not) and
+        (contains("target=/home/vscode/.pi/agent/settings.json,") | not) and
+        (contains("target=/home/vscode/.pi/agent/skills,") | not) and
+        (contains("target=/home/vscode/.pi/agent/extensions,") | not)
       )
     ) | if length > 0 then . else empty end
   ' "$devcontainer_json" 2>/dev/null) || true

@@ -55,10 +55,10 @@ RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
   ln -sf /usr/bin/batcat /usr/local/bin/bat
 
 # Create directories and set ownership (combined for fewer layers)
-RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.config /opt /opt/host-claude/docs && \
+RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi/agent /home/vscode/.config /opt /opt/host-claude/docs && \
   touch /commandhistory/.bash_history && \
   touch /commandhistory/.zsh_history && \
-  chown -R vscode:vscode /commandhistory /workspace /home/vscode/.claude /home/vscode/.config /opt
+  chown -R vscode:vscode /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi /home/vscode/.config /opt
 
 # Set environment variables
 ENV DEVCONTAINER=true
@@ -112,9 +112,9 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
   fnm install ${NODE_VERSION} && \
   fnm default ${NODE_VERSION}
 
-# Install AI review CLIs (used by /review-pr)
+# Install AI review CLIs (used by /review-pr) and Pi coding agent
 RUN export PATH="$FNM_DIR:$PATH" && eval "$(fnm env)" && \
-  npm install -g --ignore-scripts @openai/codex @google/gemini-cli
+  npm install -g --ignore-scripts @openai/codex @google/gemini-cli @earendil-works/pi-coding-agent
 
 # Install starship prompt
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.local/bin
@@ -209,7 +209,7 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL AZURE_OPENAI_API_KEY AZURE_OPENAI_BASE_URL; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
