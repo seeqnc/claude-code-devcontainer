@@ -79,8 +79,8 @@ fi
 # Switch to non-root user for remaining setup
 USER vscode
 
-# Set PATH early so claude, deno, and other user-installed binaries are available
-ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:$PATH"
+# Set PATH early so claude, deno, go, and other user-installed binaries are available
+ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:/home/vscode/go/bin:$PATH"
 
 # Install Claude Code natively with marketplace plugins
 RUN curl -fsSL https://claude.ai/install.sh | bash
@@ -111,6 +111,20 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
   eval "$(fnm env)" && \
   fnm install ${NODE_VERSION} && \
   fnm default ${NODE_VERSION}
+
+# Install Go from official tarball (override with GO_VERSION in .devc.env + rebuild)
+ARG GO_VERSION=1.24.4
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GO_ARCH=$([ "$ARCH" = "amd64" ] && echo "amd64" || echo "arm64") && \
+  curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tar.gz && \
+  rm -rf /opt/go && \
+  tar -xzf /tmp/go.tar.gz -C /opt && \
+  rm /tmp/go.tar.gz && \
+  ln -sf /opt/go/bin/go /home/vscode/.local/bin/go && \
+  ln -sf /opt/go/bin/gofmt /home/vscode/.local/bin/gofmt
+
+# Install Go LSP (for Neovim gopls support)
+RUN go install golang.org/x/tools/gopls@latest
 
 # Install AI review CLIs (used by /review-pr) and Pi coding agent
 RUN export PATH="$FNM_DIR:$PATH" && eval "$(fnm env)" && \

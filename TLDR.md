@@ -112,6 +112,7 @@ ANTHROPIC_API_KEY=...          # skip interactive `claude login`
 CLAUDE_CODE_OAUTH_TOKEN=...    # skip onboarding wizard (see section 8)
 EXA_API_KEY=...                # Exa AI search
 GEMINI_API_KEY=...             # Gemini CLI for /review-pr
+GO_VERSION=1.24.4              # optional Go version override (rebuild required)
 ```
 
 Then rebuild:
