@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   vim \
   # Network tools (for security testing)
   dnsutils \
+  # Git LFS
+  git-lfs \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install git-delta
@@ -76,6 +78,9 @@ fi
 
 # Switch to non-root user for remaining setup
 USER vscode
+
+# Register git-lfs hooks in the vscode user's global git config
+RUN git lfs install
 
 # Set PATH early so claude, deno, and other user-installed binaries are available
 ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:$PATH"
