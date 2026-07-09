@@ -63,6 +63,7 @@ RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex
 # Set environment variables
 ENV DEVCONTAINER=true
 ENV SHELL=/bin/bash
+ENV CAVEMAN_DEFAULT_MODE=full
 
 WORKDIR /workspace
 
