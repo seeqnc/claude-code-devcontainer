@@ -63,9 +63,10 @@
 		"openai-spreadsheet@skills-curated": true,
 		"react-pdf@skills-curated": true,
 		"typescript-lsp@claude-plugins-official": true,
-		"everything-claude-code@everything-claude-code": true,
+		"ecc@ecc": true,
 		"code-review@claude-plugins-official": true,
 		"pyright-lsp@claude-plugins-official": true,
-		"python-code-simplifier@skills-curated": true
+		"python-code-simplifier@skills-curated": true,
+		"caveman@caveman": true
 	}
 }
