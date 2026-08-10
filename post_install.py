@@ -618,6 +618,11 @@ def main():
     """Run all post-install configuration."""
     log("Starting post-install configuration...")
 
+    # Must run first: ~/.claude etc. are named volumes whose files may be owned
+    # by a stale UID after updateRemoteUserUID remaps the vscode user. Fixing
+    # ownership up front is what makes the writes below succeed.
+    fix_directory_ownership()
+
     setup_global_claude_md()
     setup_claude_settings()
     setup_claude_settings_from_dotfiles()
@@ -625,7 +630,6 @@ def main():
     setup_claude_hooks()
     setup_tmux_config()
     setup_onboarding_bypass()
-    fix_directory_ownership()
     setup_global_gitignore()
     setup_gh_credential_helper()
     setup_git_signing()
