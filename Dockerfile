@@ -55,7 +55,7 @@ RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
   ln -sf /usr/bin/batcat /usr/local/bin/bat
 
 # Create directories and set ownership (combined for fewer layers)
-RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi/agent /home/vscode/.config /opt /opt/host-claude/docs && \
+RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi/agent /home/vscode/.config /opt /opt/host-claude/docs /opt/host-pi && \
   touch /commandhistory/.bash_history && \
   touch /commandhistory/.zsh_history && \
   chown -R vscode:vscode /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi /home/vscode/.config /opt
@@ -188,7 +188,8 @@ RUN for f in .aliases .bash_profile .bashrc .exports .functions .vimrc; do \
     if [ -f /tmp/dotfiles/.zshrc ]; then cp /tmp/dotfiles/.zshrc "$HOME/.zshrc.custom"; fi && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -d /tmp/dotfiles/nvim ]; then cp -r /tmp/dotfiles/nvim "$HOME/.config/nvim"; fi && \
-    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi
+    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi && \
+    if [ -d /tmp/dotfiles/.pi ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.pi /opt/dotfiles/.pi; fi
 
 # Pre-install vim-plug and plugins so vim starts clean without network calls
 ARG VIM_PLUG_VERSION=0.14.0

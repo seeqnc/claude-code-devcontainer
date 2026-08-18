@@ -1,0 +1,75 @@
+{
+  "providers": {
+    "azure-fable": {
+      "name": "Azure Foundry (Fable)",
+      "baseUrl": "https://sqnc-claude-foundry.services.ai.azure.com/anthropic",
+      "api": "anthropic-messages",
+      "apiKey": "$AZURE_FOUNDRY_API_KEY",
+      "compat": {
+        "forceAdaptiveThinking": true,
+        "allowEmptySignature": true,
+        "supportsEagerToolInputStreaming": false
+      },
+      "models": [
+        {
+          "id": "claude-fable-5",
+          "name": "Claude Fable 5 (Azure)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "cost": { "input": 10.0, "output": 50.0, "cacheRead": 1.0, "cacheWrite": 12.5 }
+        }
+      ]
+    },
+    "azure-gpt": {
+      "name": "Azure Foundry (GPT)",
+      "baseUrl": "https://sqnc-claude-foundry.services.ai.azure.com/openai/v1",
+      "api": "azure-openai-responses",
+      "apiKey": "$AZURE_FOUNDRY_API_KEY",
+      "headers": { "api-key": "$AZURE_FOUNDRY_API_KEY" },
+      "compat": { "supportsReasoningEffort": true, "supportsStore": false },
+      "models": [
+        {
+          "id": "gpt-5.6-sol",
+          "name": "GPT-5.6 Sol (Azure)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 922000,
+          "maxTokens": 128000,
+          "cost": { "input": 5.0, "output": 30.0, "cacheRead": 0.5, "cacheWrite": 6.25 },
+          "thinkingLevelMap": {
+            "off": "none", "minimal": null, "low": "low",
+            "medium": "medium", "high": "high", "xhigh": "xhigh", "max": "max"
+          }
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "name": "GPT-5.6 Terra (Azure)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 922000,
+          "maxTokens": 128000,
+          "cost": { "input": 2.0, "output": 12.0, "cacheRead": 0.2, "cacheWrite": 2.5 },
+          "thinkingLevelMap": {
+            "off": "none", "minimal": null, "low": "low",
+            "medium": "medium", "high": "high", "xhigh": "xhigh", "max": "max"
+          }
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "name": "GPT-5.6 Luna (Azure)",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 922000,
+          "maxTokens": 128000,
+          "cost": { "input": 0.2, "output": 1.2, "cacheRead": 0.02, "cacheWrite": 0.25 },
+          "thinkingLevelMap": {
+            "off": "none", "minimal": null, "low": "low",
+            "medium": "medium", "high": "high", "xhigh": "xhigh", "max": "max"
+          }
+        }
+      ]
+    }
+  }
+}
