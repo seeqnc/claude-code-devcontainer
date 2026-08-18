@@ -226,10 +226,17 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL AZURE_OPENAI_API_KEY AZURE_OPENAI_BASE_URL; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL AZURE_OPENAI_API_KEY AZURE_OPENAI_BASE_URL AZURE_FOUNDRY_API_KEY ANTHROPIC_FOUNDRY_API_KEY; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
+# Claude Code via Azure AI Foundry (only when key present)
+if [[ -n "$ANTHROPIC_FOUNDRY_API_KEY" ]]; then
+  export CLAUDE_CODE_USE_FOUNDRY=1
+  export ANTHROPIC_MODEL="claude-fable-5[1m]"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
+fi
 # Container-local ssh-agent for signing key (not forwarded from host)
 # Exit codes: 0 = has keys, 1 = no keys, 2 = can't connect
 export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
