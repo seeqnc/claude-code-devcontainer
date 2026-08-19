@@ -109,11 +109,14 @@ GIT_SIGNING_KEY=~/.ssh/github_signing
 
 # Optional
 ANTHROPIC_API_KEY=...          # skip interactive `claude login`
+AZURE_FOUNDRY_API_KEY=...      # run Claude Code through Azure AI Foundry (see below)
 CLAUDE_CODE_OAUTH_TOKEN=...    # skip onboarding wizard (see section 8)
 EXA_API_KEY=...                # Exa AI search
 GEMINI_API_KEY=...             # Gemini CLI for /review-pr
 GO_VERSION=1.24.4              # optional Go version override (rebuild required)
 ```
+
+**About `AZURE_FOUNDRY_API_KEY`:** set this one key and the container wires up everything Foundry needs. It feeds both `AZURE_OPENAI_API_KEY` (Azure OpenAI SDKs, pi agents) and `ANTHROPIC_FOUNDRY_API_KEY`, which is what Claude Code itself reads when talking to Foundry. When the key is present, the container shell also sets `CLAUDE_CODE_USE_FOUNDRY=1` and picks sensible default models — so Claude Code runs against your Foundry deployment instead of anthropic.com. Leave it unset and none of this kicks in; `claude` logs in the normal way.
 
 Then rebuild:
 
