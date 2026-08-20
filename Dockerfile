@@ -234,6 +234,7 @@ unset _var
 # Claude Code via Azure AI Foundry (only when key present)
 if [[ -n "$ANTHROPIC_FOUNDRY_API_KEY" ]]; then
   export CLAUDE_CODE_USE_FOUNDRY=1
+  export ANTHROPIC_FOUNDRY_RESOURCE="sqnc-claude-foundry"
   export ANTHROPIC_MODEL="claude-fable-5[1m]"
   export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
   export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
