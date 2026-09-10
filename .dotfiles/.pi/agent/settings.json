@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.84.2",
+  "lastChangelogVersion": "0.84.3",
   "defaultProvider": "azure-gpt",
   "defaultModel": "gpt-5.6-terra",
   "packages": [
@@ -18,65 +18,32 @@
     "defaultModel": "azure-gpt/gpt-5.6-terra",
     "defaultThinking": "medium",
     "agentOverrides": {
-      "scout": {
-        "model": "azure-gpt/gpt-5.6-luna",
-        "thinking": "low"
-      },
-      "researcher": {
-        "model": "azure-gpt/gpt-5.6-luna",
-        "thinking": "low"
-      },
-      "delegate": {
-        "model": "azure-gpt/gpt-5.6-terra",
-        "thinking": "medium"
-      },
-      "worker": {
-        "model": "azure-gpt/gpt-5.6-terra",
-        "thinking": "medium"
-      },
-      "reviewer": {
-        "model": "azure-gpt/gpt-5.6-terra",
-        "thinking": "medium"
-      },
-      "context-builder": {
-        "model": "azure-gpt/gpt-5.6-sol",
-        "thinking": "high"
-      },
-      "planner": {
-        "model": "azure-gpt/gpt-5.6-sol",
-        "thinking": "high"
-      },
+      "scout":     { "model": "azure-gpt/gpt-5.6-luna",  "thinking": "low" },
+      "researcher":{ "model": "azure-gpt/gpt-5.6-luna",  "thinking": "low" },
+      "delegate":  { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" },
+      "worker":    { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium", "maxExecutionTimeMs": 600000 },
+      "reviewer":  { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" },
+      "context-builder": { "model": "azure-gpt/gpt-5.6-sol", "thinking": "high" },
+      "planner":   { "model": "azure-gpt/gpt-5.6-sol",   "thinking": "high" },
       "oracle": {
-        "model": "azure-fable/claude-fable-5",
-        "thinking": "medium",
-        "defaultContext": "fresh",
-        "fallbackModels": [
-          "azure-gpt/gpt-5.6-sol"
-        ]
+        "model": "azure-gpt/gpt-6-astra",
+        "thinking": "high",
+        "fallbackModels": ["azure-gpt/gpt-5.6-sol"]
       },
       "advisor": {
-        "model": "azure-fable/claude-fable-5",
-        "thinking": "medium",
-        "defaultContext": "fresh",
-        "fallbackModels": [
-          "azure-gpt/gpt-5.6-sol"
-        ]
+        "model": "azure-gpt/gpt-6-astra",
+        "thinking": "high",
+        "fallbackModels": ["azure-gpt/gpt-5.6-sol"]
       }
     },
     "modelScope": {
       "enforce": true,
-      "allow": [
-        "azure-gpt/*",
-        "azure-fable/*"
-      ]
+      "strict": true,
+      "allow": ["azure-gpt/*"]
     },
     "watchdog": {
       "enabled": true,
-      "main": {
-        "model": "azure-gpt/gpt-5.6-terra",
-        "thinking": "medium",
-        "enabled": true
-      }
+      "main": { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" }
     }
   }
 }
