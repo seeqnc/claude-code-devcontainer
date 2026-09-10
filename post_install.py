@@ -205,6 +205,48 @@ def setup_global_claude_md():
     log("Global docs installed from host")
 
 
+def setup_pi_config():
+    """Install pi agent config (settings.json, models.json): host wins, dotfiles fallback.
+
+    Host ~/.pi/agent/{settings,models}.json are bind-mounted read-only at
+    /opt/host-pi/. If a host file parses to non-empty JSON (not the "{}"
+    seeded by initializeCommand), it is copied to ~/.pi/agent/ as-is —
+    deliberately whole-file, not deep-merged like the Claude settings.
+    Otherwise the default from /opt/dotfiles/.pi/agent/ is used, if present.
+
+    Note: dotfiles pi skills are NOT deployed — ~/.pi/agent/skills is a
+    read-only host bind mount, so skills only reach the container via the
+    host's ~/.pi/agent/skills.
+    """
+    target_dir = Path.home() / ".pi" / "agent"
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    for name in ("settings.json", "models.json"):
+        host_file = Path("/opt/host-pi") / name
+        default_file = Path("/opt/dotfiles/.pi/agent") / name
+        target = target_dir / name
+
+        source = None
+        try:
+            if host_file.is_file() and json.loads(host_file.read_text(encoding="utf-8")):
+                source = host_file
+        except (OSError, ValueError) as e:
+            log_warn(f"could not read {host_file}, falling back to dotfiles default: {e}")
+
+        if source is None and default_file.is_file():
+            source = default_file
+
+        if source is None:
+            log(f"No pi {name} found (host or dotfiles), skipping")
+            continue
+
+        try:
+            shutil.copy2(source, target)
+            log(f"Pi {name} installed from {source}")
+        except OSError as e:
+            log_warn(f"could not install pi {name}: {e}")
+
+
 def fix_directory_ownership():
     """Fix ownership of mounted volumes that may have root ownership."""
     uid = os.getuid()
@@ -212,6 +254,8 @@ def fix_directory_ownership():
 
     dirs_to_fix = [
         Path.home() / ".claude",
+        Path.home() / ".codex",
+        Path.home() / ".pi",
         Path("/commandhistory"),
         Path.home() / ".config" / "gh",
     ]
@@ -366,6 +410,31 @@ def setup_claude_statusline():
         log(f"Claude statusline deployed: {target}")
     except OSError as e:
         log_warn(f"failed to deploy statusline: {e}")
+
+
+def setup_claude_hooks():
+    """Deploy hook scripts from dotfiles into the volume-mounted Claude config."""
+    staged = Path("/opt/dotfiles/.claude/hooks")
+    if not staged.is_dir():
+        return
+
+    target = Path.home() / ".claude" / "hooks"
+    target.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    for src in staged.iterdir():
+        if not src.is_file():
+            continue
+        dst = target / src.name
+        try:
+            dst.write_bytes(src.read_bytes())
+            dst.chmod(0o755)
+            count += 1
+        except OSError as e:
+            log_warn(f"failed to deploy hook {src.name}: {e}")
+
+    if count:
+        log(f"Claude hooks deployed: {count} script(s) to {target}")
 
 
 def setup_global_gitignore():
@@ -591,13 +660,19 @@ def main():
     """Run all post-install configuration."""
     log("Starting post-install configuration...")
 
+    # Must run first: ~/.claude etc. are named volumes whose files may be owned
+    # by a stale UID after updateRemoteUserUID remaps the vscode user. Fixing
+    # ownership up front is what makes the writes below succeed.
+    fix_directory_ownership()
+
     setup_global_claude_md()
     setup_claude_settings()
     setup_claude_settings_from_dotfiles()
     setup_claude_statusline()
+    setup_claude_hooks()
+    setup_pi_config()
     setup_tmux_config()
     setup_onboarding_bypass()
-    fix_directory_ownership()
     setup_global_gitignore()
     setup_gh_credential_helper()
     setup_git_signing()

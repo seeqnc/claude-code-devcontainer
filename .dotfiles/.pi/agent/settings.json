@@ -1,0 +1,49 @@
+{
+  "lastChangelogVersion": "0.84.3",
+  "defaultProvider": "azure-gpt",
+  "defaultModel": "gpt-5.6-terra",
+  "packages": [
+    "npm:pi-subagents",
+    "npm:@juicesharp/rpiv-todo",
+    "npm:pi-simplify",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@juicesharp/rpiv-advisor",
+    "npm:pi-lens",
+    "npm:context-mode",
+    "npm:pi-web-access"
+  ],
+  "theme": "dark",
+  "hideThinkingBlock": true,
+  "subagents": {
+    "defaultModel": "azure-gpt/gpt-5.6-terra",
+    "defaultThinking": "medium",
+    "agentOverrides": {
+      "scout":     { "model": "azure-gpt/gpt-5.6-luna",  "thinking": "low" },
+      "researcher":{ "model": "azure-gpt/gpt-5.6-luna",  "thinking": "low" },
+      "delegate":  { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" },
+      "worker":    { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium", "maxExecutionTimeMs": 600000 },
+      "reviewer":  { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" },
+      "context-builder": { "model": "azure-gpt/gpt-5.6-sol", "thinking": "high" },
+      "planner":   { "model": "azure-gpt/gpt-5.6-sol",   "thinking": "high" },
+      "oracle": {
+        "model": "azure-gpt/gpt-6-astra",
+        "thinking": "high",
+        "fallbackModels": ["azure-gpt/gpt-5.6-sol"]
+      },
+      "advisor": {
+        "model": "azure-gpt/gpt-6-astra",
+        "thinking": "high",
+        "fallbackModels": ["azure-gpt/gpt-5.6-sol"]
+      }
+    },
+    "modelScope": {
+      "enforce": true,
+      "strict": true,
+      "allow": ["azure-gpt/*"]
+    },
+    "watchdog": {
+      "enabled": true,
+      "main": { "model": "azure-gpt/gpt-5.6-terra", "thinking": "medium" }
+    }
+  }
+}

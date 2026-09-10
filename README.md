@@ -224,6 +224,20 @@ The `.devc.env` file is gitignored and never mounted into the container — Clau
 
 If a key is not set anywhere, the variable is left unset inside the container so tools fall back to their default auth flow (e.g., `claude login`).
 
+## Toolchain Version Overrides
+
+You can pin Go to a specific version from the official tarball at rebuild time:
+
+```bash
+# .devc.env
+GO_VERSION=1.24.4
+
+# Rebuild to apply
+devc rebuild
+```
+
+If `GO_VERSION` is unset, the image default is used.
+
 ## AI Review CLIs
 
 The container includes [Codex](https://github.com/openai/codex) and [Gemini CLI](https://github.com/google/gemini-cli), used by the `/review-pr` skill to provide independent review perspectives alongside Claude.
@@ -372,7 +386,7 @@ The container auto-configures `bypassPermissions` mode—Claude runs commands wi
 
 | Component | Details |
 |-----------|---------|
-| Base | Ubuntu 24.04, Node.js 22, Python 3.13 + uv, Deno |
+| Base | Ubuntu 24.04, Node.js 22, Python 3.13 + uv, Go (official tarball), Deno |
 | Shells | bash (default) and zsh (Oh My Zsh), both with starship prompt |
 | User | `vscode` (passwordless sudo), working dir `/workspace` |
 | Search & nav | `rg`, `fd`, `fzf`, `zoxide` (`j` to jump) |
@@ -444,7 +458,7 @@ devcontainer exec --workspace-folder . zsh
 
 # Verify tools
 devcontainer exec --workspace-folder . bash -c \
-  "starship --version && zoxide --version && bat --version && eza --version && lazygit --version && fd --version && deno --version && claude --version"
+  "starship --version && zoxide --version && bat --version && eza --version && lazygit --version && fd --version && go version && gopls version && deno --version && claude --version"
 
 # Verify both shells
 devcontainer exec --workspace-folder . zsh -ic "type j && type ll && type sg"

@@ -120,7 +120,7 @@ return {
 				capabilities = cmp_lsp.default_capabilities(capabilities)
 			end
 
-			local servers = { "basedpyright", "ruff", "ts_ls" }
+			local servers = { "basedpyright", "ruff", "ts_ls", "gopls" }
 			for _, server in ipairs(servers) do
 				vim.lsp.config(server, { capabilities = capabilities })
 			end
@@ -173,6 +173,7 @@ return {
 			require("conform").setup({
 				formatters_by_ft = {
 					python = { "ruff_format" },
+					go = { "gofmt" },
 					typescript = { "deno_fmt", "prettier", stop_after_first = true },
 					typescriptreact = { "deno_fmt", "prettier", stop_after_first = true },
 					javascript = { "deno_fmt", "prettier", stop_after_first = true },

@@ -109,10 +109,14 @@ GIT_SIGNING_KEY=~/.ssh/github_signing
 
 # Optional
 ANTHROPIC_API_KEY=...          # skip interactive `claude login`
+AZURE_FOUNDRY_API_KEY=...      # run Claude Code through Azure AI Foundry (see below)
 CLAUDE_CODE_OAUTH_TOKEN=...    # skip onboarding wizard (see section 8)
 EXA_API_KEY=...                # Exa AI search
 GEMINI_API_KEY=...             # Gemini CLI for /review-pr
+GO_VERSION=1.24.4              # optional Go version override (rebuild required)
 ```
+
+**About `AZURE_FOUNDRY_API_KEY`:** set this one key and the container wires up everything Foundry needs. It feeds both `AZURE_OPENAI_API_KEY` (Azure OpenAI SDKs, pi agents) and `ANTHROPIC_FOUNDRY_API_KEY`, which is what Claude Code itself reads when talking to Foundry. When the key is present, the container shell also sets `CLAUDE_CODE_USE_FOUNDRY=1` and picks sensible default models — so Claude Code runs against your Foundry deployment instead of anthropic.com. Leave it unset and none of this kicks in; `claude` logs in the normal way.
 
 Then rebuild:
 
@@ -263,13 +267,17 @@ This key is only used for signing. Push/pull access is handled by `GH_TOKEN` via
 
 The devcontainer can join your Tailscale network via a sidecar container. This gives the container a stable hostname on your tailnet — useful for exposing dev servers, webhooks, or APIs without port forwarding.
 
-### Setup
+### First Time Setup
+
+This is likely not needed if the OAuth client has already been setup. You can get the credential from either Bostjan or Oliver
 
 1. Create a [Tailscale OAuth client](https://login.tailscale.com/admin/settings/oauth) with the `devices` scope and the tag `tag:dev-container`.
 
 2. Find the image SHA for your architecture from the [tailscale/tailscale](https://hub.docker.com/r/tailscale/tailscale/tags) Docker Hub page.
 
-3. Add to `.devc.env`:
+### Adding Tailscale to Dev Container setup
+
+1. Add to `.devc.env`:
 
 ```bash
 TS_CLIENT_ID=<your-client-id>
@@ -278,7 +286,7 @@ TS_HOSTNAME=ts-devc-yourname
 TS_IMAGE_SHA=sha256:<arch-specific-sha>
 ```
 
-4. Run `devc rebuild`. The tailscale sidecar starts first, the devcontainer shares its network stack.
+2. Run `devc rebuild`. The tailscale sidecar starts first, the devcontainer shares its network stack.
 
 ### How it works
 
@@ -293,14 +301,64 @@ Services listening inside the container are reachable from your tailnet at `http
 | `TS_CLIENT_ID` | (required) | Tailscale OAuth client ID |
 | `TS_CLIENT_SECRET` | (required) | Tailscale OAuth client secret |
 | `TS_HOSTNAME` | `ts-devc` | Device hostname on your tailnet |
-| `TS_IMAGE_SHA` | (required) | Architecture-specific image digest |
+| `TS_IMAGE_SHA` | (required) | Architecture-specific image digest (`sha256:...`) |
 | `TS_EXTRA_ARGS` | `--advertise-tags=tag:dev-container` | Additional `tailscaled` arguments |
+| `TS_DISABLED` | (unset) | Set to any value to force-disable Tailscale |
 
 ### Without Tailscale
 
-Comment out or remove `TS_CLIENT_ID` and `TS_CLIENT_SECRET` from `.devc.env`, then `devc rebuild`. The devcontainer runs standalone without the sidecar.
+Either comment out `TS_CLIENT_ID` and `TS_CLIENT_SECRET`, or set `TS_DISABLED=1` in `.devc.env`:
 
-## 13. Extra packages and mounts
+```bash
+TS_DISABLED=1
+```
+
+Then `devc rebuild`. The devcontainer runs standalone without the sidecar. `TS_DISABLED` takes precedence — Tailscale is skipped even if credentials are present.
+
+## 13. Shared Docker network (optional)
+
+If your project runs its own `docker compose` services (Postgres, Redis, etc.) and you want the devcontainer to reach them by hostname, create a shared external network and point the devcontainer at it.
+
+### Setup
+
+1. Create the network (once, on the host):
+
+```bash
+docker network create devshared
+```
+
+2. Add the network to your project's `docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    networks:
+      - devshared
+
+networks:
+  devshared:
+    external: true
+```
+
+3. Set `DEVC_NETWORK` in `.devc.env`:
+
+```bash
+DEVC_NETWORK=devshared
+```
+
+4. `devc rebuild`. The devcontainer now shares the `devshared` network and can reach `postgres:5432` by service name.
+
+### How it works
+
+When `DEVC_NETWORK` is set, `devc` generates a `docker-compose.network.yml` overlay that attaches the devcontainer to the named external network while keeping the default compose network intact.
+
+### Limitations
+
+- **Incompatible with Tailscale**: Tailscale uses `network_mode: service:tailscale`, which replaces all network settings. `devc` will error if both are enabled.
+- The network must already exist before `devc up`/`rebuild`. Create it with `docker network create <name>`.
+
+## 14. Extra packages and mounts
 
 ### Extra apt packages
 
@@ -336,7 +394,7 @@ DEVC_GPU=2          # specific count (1-128)
 
 Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). A `docker-compose.gpu.yml` overlay is generated automatically.
 
-## 14. Quick reference
+## 15. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|

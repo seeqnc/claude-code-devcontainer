@@ -43,7 +43,13 @@
     "source=${localEnv:HOME}/.claude/docs,target=/opt/host-claude/docs,type=bind,readonly",
     "source=${localEnv:HOME}/.claude/commands,target=/home/vscode/.claude/commands,type=bind,readonly",
     "source=${localEnv:HOME}/.claude/skills,target=/home/vscode/.claude/skills,type=bind,readonly",
-    "source=${localEnv:HOME}/.claude/rules,target=/home/vscode/.claude/rules,type=bind,readonly"
+    "source=${localEnv:HOME}/.claude/rules,target=/home/vscode/.claude/rules,type=bind,readonly",
+    "source=${localEnv:HOME}/.codex/hooks.json,target=/home/vscode/.codex/hooks.json,type=bind,readonly",
+    "source=${localEnv:HOME}/.codex/skills,target=/home/vscode/.codex/skills,type=bind,readonly",
+    "source=${localEnv:HOME}/.pi/agent/settings.json,target=/opt/host-pi/settings.json,type=bind,readonly",
+    "source=${localEnv:HOME}/.pi/agent/models.json,target=/opt/host-pi/models.json,type=bind,readonly",
+    "source=${localEnv:HOME}/.pi/agent/skills,target=/home/vscode/.pi/agent/skills,type=bind,readonly",
+    "source=${localEnv:HOME}/.pi/agent/extensions,target=/home/vscode/.pi/agent/extensions,type=bind,readonly"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
@@ -64,12 +70,16 @@
     "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
     "EXA_API_KEY": "${localEnv:EXA_API_KEY}",
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
-    "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}"
+    "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}",
+    "AZURE_OPENAI_API_KEY": "${localEnv:AZURE_FOUNDRY_API_KEY}",
+    "AZURE_OPENAI_BASE_URL": "${localEnv:CODEX_AZURE_BASE_URL}",
+    "AZURE_FOUNDRY_API_KEY": "${localEnv:AZURE_FOUNDRY_API_KEY}",
+    "ANTHROPIC_FOUNDRY_API_KEY": "${localEnv:AZURE_FOUNDRY_API_KEY}"
   },
   "remoteEnv": {
     "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN:}"
   },
-  "initializeCommand": "{ test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\"; } && mkdir -p \"$HOME/.claude/commands\" \"$HOME/.claude/skills\" \"$HOME/.claude/rules\" \"$HOME/.claude/docs\" && { test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\"; }",
+  "initializeCommand": "{ test -f \"$HOME/.gitconfig\" || touch \"$HOME/.gitconfig\"; } && mkdir -p \"$HOME/.claude/commands\" \"$HOME/.claude/skills\" \"$HOME/.claude/rules\" \"$HOME/.claude/docs\" && { test -f \"$HOME/.claude/CLAUDE.md\" || touch \"$HOME/.claude/CLAUDE.md\"; } && mkdir -p \"$HOME/.codex/skills\" && { test -f \"$HOME/.codex/hooks.json\" || echo '{}' > \"$HOME/.codex/hooks.json\"; } && mkdir -p \"$HOME/.pi/agent/skills\" \"$HOME/.pi/agent/extensions\" && { test -f \"$HOME/.pi/agent/settings.json\" || echo '{}' > \"$HOME/.pi/agent/settings.json\"; } && { test -f \"$HOME/.pi/agent/models.json\" || echo '{}' > \"$HOME/.pi/agent/models.json\"; }",
   "workspaceFolder": "/workspace",
   "postCreateCommand": "uv run --no-project /opt/post_install.py"
 }

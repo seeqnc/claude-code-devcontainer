@@ -37,7 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install git-delta
 ARG GIT_DELTA_VERSION=0.18.2
-RUN curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${TARGETARCH}.deb" -o /tmp/git-delta.deb && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" -o /tmp/git-delta.deb && \
   dpkg -i /tmp/git-delta.deb && \
   rm /tmp/git-delta.deb
 
@@ -46,21 +47,23 @@ COPY --from=uv /uv /usr/local/bin/uv
 
 # Install fzf from GitHub releases (newer than apt, includes built-in shell integration)
 ARG FZF_VERSION=0.70.0
-RUN curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${TARGETARCH}.tar.gz" | tar -xz -C /usr/local/bin
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_${ARCH}.tar.gz" | tar -xz -C /usr/local/bin
 
 # Create symlinks for Ubuntu package names -> standard names
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
   ln -sf /usr/bin/batcat /usr/local/bin/bat
 
 # Create directories and set ownership (combined for fewer layers)
-RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.config /opt /opt/host-claude/docs && \
+RUN mkdir -p /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi/agent /home/vscode/.config /opt /opt/host-claude/docs /opt/host-pi && \
   touch /commandhistory/.bash_history && \
   touch /commandhistory/.zsh_history && \
-  chown -R vscode:vscode /commandhistory /workspace /home/vscode/.claude /home/vscode/.config /opt
+  chown -R vscode:vscode /commandhistory /workspace /home/vscode/.claude /home/vscode/.codex /home/vscode/.pi /home/vscode/.config /opt
 
 # Set environment variables
 ENV DEVCONTAINER=true
 ENV SHELL=/bin/bash
+ENV CAVEMAN_DEFAULT_MODE=full
 
 WORKDIR /workspace
 
@@ -77,8 +80,8 @@ fi
 # Switch to non-root user for remaining setup
 USER vscode
 
-# Set PATH early so claude, deno, and other user-installed binaries are available
-ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:$PATH"
+# Set PATH early so claude, deno, go, and other user-installed binaries are available
+ENV PATH="/home/vscode/.pixi/bin:/home/vscode/.deno/bin:/home/vscode/.local/bin:/home/vscode/go/bin:$PATH"
 
 # Install Claude Code natively with marketplace plugins
 RUN curl -fsSL https://claude.ai/install.sh | bash
@@ -86,6 +89,8 @@ RUN claude plugin marketplace add anthropics/skills && \
   claude plugin marketplace add trailofbits/skills && \
   claude plugin marketplace add trailofbits/skills-curated && \
   claude plugin marketplace add affaan-m/everything-claude-code && \
+  claude plugin marketplace add JuliusBrussee/caveman && \
+  claude plugin install caveman@caveman \
   claude plugin install ecc@ecc
 
 # Install Python 3.13 via uv (fast binary download, not source compilation)
@@ -110,9 +115,23 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "$FNM_D
   fnm install ${NODE_VERSION} && \
   fnm default ${NODE_VERSION}
 
-# Install AI review CLIs (used by /review-pr)
+# Install Go from official tarball (override with GO_VERSION in .devc.env + rebuild)
+ARG GO_VERSION=1.24.4
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GO_ARCH=$([ "$ARCH" = "amd64" ] && echo "amd64" || echo "arm64") && \
+  curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /tmp/go.tar.gz && \
+  rm -rf /opt/go && \
+  tar -xzf /tmp/go.tar.gz -C /opt && \
+  rm /tmp/go.tar.gz && \
+  ln -sf /opt/go/bin/go /home/vscode/.local/bin/go && \
+  ln -sf /opt/go/bin/gofmt /home/vscode/.local/bin/gofmt
+
+# Install Go LSP (for Neovim gopls support)
+RUN go install golang.org/x/tools/gopls@latest
+
+# Install AI review CLIs (used by /review-pr) and Pi coding agent
 RUN export PATH="$FNM_DIR:$PATH" && eval "$(fnm env)" && \
-  npm install -g --ignore-scripts @openai/codex @google/gemini-cli
+  npm install -g --ignore-scripts @openai/codex @google/gemini-cli @earendil-works/pi-coding-agent
 
 # Install starship prompt
 RUN curl -fsSL https://starship.rs/install.sh | sh -s -- --yes -b /home/vscode/.local/bin
@@ -122,19 +141,22 @@ RUN curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install
 
 # Install task (Taskfile runner)
 ARG TASK_VERSION=3.49.1
-RUN curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  curl -fsSL "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin task
 
 # Install lazygit
 ARG LAZYGIT_VERSION=0.44.1
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${GNU_ARCH}.tar.gz" | tar -xz -C /home/vscode/.local/bin lazygit
 
 # Install prek (fast pre-commit hooks in Rust)
 ARG PREK_VERSION=0.3.8
 ARG PREK_SHA_AMD64=80ec6adb9f1883344de52cb943d371ecfd25340c4a6b5b81e2600d27e246cfa1
 ARG PREK_SHA_ARM64=e2119993923e9bdc28aca11f89361197f8c70648cb016bb6103379445e21758a
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
-  EXPECTED_SHA=$([ "$TARGETARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") && \
+  EXPECTED_SHA=$([ "$ARCH" = "amd64" ] && echo "$PREK_SHA_AMD64" || echo "$PREK_SHA_ARM64") && \
   curl -fsSL "https://github.com/j178/prek/releases/download/v${PREK_VERSION}/prek-${GNU_ARCH}-unknown-linux-gnu.tar.gz" \
     -o /tmp/prek.tar.gz && \
   echo "${EXPECTED_SHA}  /tmp/prek.tar.gz" | sha256sum -c - && \
@@ -143,7 +165,8 @@ RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "aarch64") &
 
 # Install neovim
 ARG NVIM_VERSION=0.12.0
-RUN GNU_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x86_64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  GNU_ARCH=$([ "$ARCH" = "amd64" ] && echo "x86_64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${GNU_ARCH}.tar.gz" | tar -xz -C /opt && \
   mv /opt/nvim-linux-${GNU_ARCH} /opt/nvim && \
   ln -sf /opt/nvim/bin/nvim /home/vscode/.local/bin/nvim
@@ -165,7 +188,8 @@ RUN for f in .aliases .bash_profile .bashrc .exports .functions .vimrc; do \
     if [ -f /tmp/dotfiles/.zshrc ]; then cp /tmp/dotfiles/.zshrc "$HOME/.zshrc.custom"; fi && \
     if [ -f /tmp/dotfiles/starship.toml ]; then cp /tmp/dotfiles/starship.toml "$HOME/.config/starship.toml"; fi && \
     if [ -d /tmp/dotfiles/nvim ]; then cp -r /tmp/dotfiles/nvim "$HOME/.config/nvim"; fi && \
-    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi
+    if [ -d /tmp/dotfiles/.claude ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.claude /opt/dotfiles/.claude; fi && \
+    if [ -d /tmp/dotfiles/.pi ]; then mkdir -p /opt/dotfiles; cp -r /tmp/dotfiles/.pi /opt/dotfiles/.pi; fi
 
 # Pre-install vim-plug and plugins so vim starts clean without network calls
 ARG VIM_PLUG_VERSION=0.14.0
@@ -175,7 +199,8 @@ RUN curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 
 # Install tree-sitter CLI (needed by nvim-treesitter to compile parsers)
 ARG TREE_SITTER_VERSION=0.26.7
-RUN TS_ARCH=$([ "$TARGETARCH" = "amd64" ] && echo "x64" || echo "$TARGETARCH") && \
+RUN ARCH=${TARGETARCH:-$(dpkg --print-architecture)} && \
+  TS_ARCH=$([ "$ARCH" = "amd64" ] && echo "x64" || echo "$ARCH") && \
   curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-${TS_ARCH}.gz" | gunzip > /home/vscode/.local/bin/tree-sitter && \
   chmod +x /home/vscode/.local/bin/tree-sitter
 
@@ -202,13 +227,24 @@ if [[ -z "$TERM" ]] || { command -v infocmp &>/dev/null && ! infocmp "$TERM" &>/
   export TERM=xterm-256color
 fi
 # Unset empty credential vars (localEnv sets "" when unset on host)
-for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL; do
+for _var in ANTHROPIC_API_KEY OPENAI_API_KEY EXA_API_KEY GH_TOKEN GEMINI_API_KEY CODEX_AZURE_BASE_URL AZURE_OPENAI_API_KEY AZURE_OPENAI_BASE_URL AZURE_FOUNDRY_API_KEY ANTHROPIC_FOUNDRY_API_KEY; do
   [[ -z "${!_var}" ]] && unset "$_var"
 done
 unset _var
+# Claude Code via Azure AI Foundry (only when key present)
+if [[ -n "$ANTHROPIC_FOUNDRY_API_KEY" ]]; then
+  export CLAUDE_CODE_USE_FOUNDRY=1
+  export ANTHROPIC_FOUNDRY_RESOURCE="sqnc-claude-foundry"
+  export ANTHROPIC_MODEL="claude-fable-5[1m]"
+  export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
+  export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
+fi
 # Container-local ssh-agent for signing key (not forwarded from host)
+# Exit codes: 0 = has keys, 1 = no keys, 2 = can't connect
 export SSH_AUTH_SOCK="/tmp/ssh-agent-vscode.sock"
-if [[ ! -S "$SSH_AUTH_SOCK" ]]; then
+ssh-add -l &>/dev/null
+if [[ $? -eq 2 ]]; then
+  rm -f "$SSH_AUTH_SOCK"
   eval "$(ssh-agent -a "$SSH_AUTH_SOCK")" >/dev/null
 fi
 # Auto-add signing key if mounted and not yet in agent
