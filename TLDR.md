@@ -394,7 +394,15 @@ DEVC_GPU=2          # specific count (1-128)
 
 Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). A `docker-compose.gpu.yml` overlay is generated automatically.
 
-## 15. Quick reference
+## 15. ORCA desktop app (optional)
+
+If your devcontainer runs on a VM, the [ORCA](https://onorca.dev) desktop app on your Mac can run Claude agents and git worktrees inside it over SSH, while the editor and diffs stay on the Mac. The container gets its own SSH server, published on the VM's `127.0.0.1` only, and your Mac reaches it through your normal VM login with `ProxyJump`.
+
+Connect ORCA to the container, never to the VM itself. Agents started on the VM run outside the sandbox.
+
+Setup steps, rebuild notes and troubleshooting: [docs/orca.md](docs/orca.md).
+
+## 16. Quick reference
 
 | What                            | Command                                    |
 |---------------------------------|--------------------------------------------|
